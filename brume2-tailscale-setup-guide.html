@@ -95,16 +95,15 @@ th {
 <li><a href="#step10">Step 10: Verify Tailscale Routing</a></li>
 <li><a href="#step11">Step 11: Reconfigure Remote ATA for Deployment</a></li>
 <li><a href="#step12">Step 12: Verify Remote SIP Registration</a></li>
-<li><a href="#step13">Step 13: Test Remote Setup Through Tunnel</a></li>
-<li><a href="#step14">Step 14: Deploy to Remote Site</a></li>
+<li><a href="#step13">Step 13: Deploy to Remote Site</a></li>
 </ul>
 
 <p><strong>Final Steps:</strong></p>
 <ul>
-<li><a href="#step15">Step 15: Reboot Test</a></li>
-<li><a href="#step16">Step 16: Make a Test Call</a></li>
-<li><a href="#step17">Step 17: Export Backups</a></li>
-<li><a href="#optional-wireless">Optional: Wireless Setup with Beryl AX</a></li>
+<li><a href="#step14">Step 14: Reboot Test</a></li>
+<li><a href="#step15">Step 15: Make a Test Call</a></li>
+<li><a href="#step16">Step 16: Export Backups</a></li>
+<li><a href="#optional-wireless">Optional: Wireless Setup with Beryl AX (Remote Sites)</a></li>
 </ul>
 
 <h2>Main Site Setup</h2>
@@ -612,41 +611,7 @@ asterisk -rx "sip show peers" | grep 101</code></div>
 <p>If not registered, wait 1-2 minutes or reboot the ATA.</p>
 
 <a name="step13"></a>
-<h2>Step 13: Test Remote Setup Through Tunnel</h2>
-
-<p>Before shipping the remote Brume and ATA, test everything locally to confirm it works through the Tailscale tunnel.</p>
-
-<h3>Make a Test Call</h3>
-
-<ol>
-<li>With the remote Brume connected to your local network (WAN port to your router)</li>
-<li>ATA connected to the remote Brume's LAN port</li>
-<li>Phone connected to the ATA</li>
-<li>Pick up the phone - you should hear dial tone</li>
-<li>Dial the main site extension (e.g., 100)</li>
-<li>The main site phone should ring</li>
-<li>Answer and verify two-way audio works</li>
-</ol>
-
-<h3>Troubleshooting</h3>
-
-<p>If no dial tone:</p>
-<ul>
-<li>Check ATA registration in the ATA's web interface</li>
-<li>Verify Tailscale routing (<a href="#step10">Step 10</a>)</li>
-<li>Check firewall configuration (<a href="#step9">Step 9</a>)</li>
-</ul>
-
-<p>If dial tone but call doesn't connect:</p>
-<ul>
-<li>Verify extension numbers match FreePBX configuration</li>
-<li>Check FreePBX logs for errors</li>
-</ul>
-
-<p>Once the test call succeeds, the remote setup is ready for deployment.</p>
-
-<a name="step14"></a>
-<h2>Step 14: Deploy to Remote Site</h2>
+<h2>Step 13: Deploy to Remote Site</h2>
 
 <p>Once pre-configured and tested locally, deployment is simple:</p>
 
@@ -659,12 +624,24 @@ asterisk -rx "sip show peers" | grep 101</code></div>
 <li>Test by calling between the remote phone and main site phone</li>
 </ol>
 
-<p>If anything goes wrong, you can SSH to the Brume via its Tailscale IP from your computer (with Tailscale client running and logged in).</p>
+<h3>Remote Administration</h3>
+
+<p>If anything goes wrong, you can access the Brume remotely via its Tailscale IP:</p>
+
+<ol>
+<li>Visit the <a href="https://login.tailscale.com/admin/machines">Tailscale admin console</a></li>
+<li>Find the Brume 2 you need to access</li>
+<li>Click the dropdown arrow next to the Tailscale IP address and click the copy icon</li>
+<li>Make sure the Tailscale client app is running and logged in on your computer</li>
+<li>Paste that IP address into a new browser tab - you're now logged into the Brume 2 web admin remotely</li>
+<li>To access the ATA, go to the <strong>Clients</strong> tab in the Brume 2 admin to find the ATA's IP address</li>
+<li>Copy that IP and paste it into a new browser tab to access the ATA's web admin</li>
+</ol>
 
 <h2>Final Steps</h2>
 
-<a name="step15"></a>
-<h2>Step 15: Reboot Test</h2>
+<a name="step14"></a>
+<h2>Step 14: Reboot Test</h2>
 
 <p>Verify everything survives a power cycle:</p>
 
@@ -684,8 +661,8 @@ asterisk -rx "sip show peers" | grep 101</code></div>
 <li>Subnet route is still approved in Tailscale admin</li>
 </ul>
 
-<a name="step16"></a>
-<h2>Step 16: Make a Test Call</h2>
+<a name="step15"></a>
+<h2>Step 15: Make a Test Call</h2>
 
 <p>The ultimate test - pick up the phone and make a call!</p>
 
@@ -706,11 +683,10 @@ asterisk -rx "sip show peers" | grep 101</code></div>
 <p>If you hear dial tone but calls don't connect:</p>
 <ul>
 <li>Verify the dial plan on the ATA allows the numbers you're dialing</li>
-<li>Check FreePBX outbound routes if calling external numbers</li>
 </ul>
 
-<a name="step17"></a>
-<h2>Step 17: Export Backups</h2>
+<a name="step16"></a>
+<h2>Step 16: Export Backups</h2>
 
 <p>Save a backup of each Brume configuration:</p>
 
@@ -728,9 +704,9 @@ asterisk -rx "sip show peers" | grep 101</code></div>
 <p>Store backups safely - they can restore the full configuration if needed.</p>
 
 <a name="optional-wireless"></a>
-<h2>Optional: Wireless Setup with Beryl AX</h2>
+<h2>Optional: Wireless Setup with Beryl AX (Remote Sites)</h2>
 
-<p>If you don't want to place the phone right next to the router or need to avoid running ethernet or phone cables to where you want the phone, you can use a wireless subnet router instead: the <a href="https://www.gl-inet.com/products/gl-mt3000/">GL.iNet Beryl AX (GL-MT3000)</a>.</p>
+<p>For remote sites where you don't want to place the phone right next to the router or need to avoid running cables, you can use a wireless subnet router instead: the <a href="https://www.gl-inet.com/products/gl-mt3000/">GL.iNet Beryl AX (GL-MT3000)</a>.</p>
 
 <p>The Beryl AX connects wirelessly to the remote site's existing WiFi router, then provides a wired ethernet port for the ATA. This lets you place the phone anywhere with a power outlet and WiFi coverage.</p>
 
@@ -794,7 +770,7 @@ asterisk -rx "sip show peers" | grep 101</code></div>
 <tr><td><code>/etc/tailscale/tailscaled.state</code></td><td>Tailscale auth state</td></tr>
 </table>
 
-<h3>Essential Commands</h3>
+<h3>Essential Commands (Brume 2/Beryl AX)</h3>
 
 <div class="code-box"><code># Check Tailscale status
 tailscale status
@@ -814,6 +790,30 @@ iptables -t nat -L POSTROUTING -n -v | grep MASQ
 
 # Restart firewall (also runs firewall.user)
 /etc/init.d/firewall restart</code></div>
+
+<h3>Essential Commands (RasPBX)</h3>
+
+<div class="code-box"><code># Check registered extensions
+asterisk -rx "pjsip show endpoints"
+# or for chan_sip:
+asterisk -rx "sip show peers"
+
+# Monitor SIP activity in real-time
+asterisk -rx "pjsip set logger on"
+# Type Control+C to exit
+
+# Live console with verbosity (more v's = more detail)
+asterisk -rvvvv
+# Type "quit" or "exit" to leave
+
+# Check active calls
+asterisk -rx "core show calls"
+
+# View recent call history
+asterisk -rx "core show channels verbose"
+
+# Restart Asterisk (if needed)
+systemctl restart asterisk</code></div>
 
 <h3>Firewall Configuration Differences</h3>
 

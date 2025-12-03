@@ -52,14 +52,13 @@ Remote Site                          Main Site
 - Step 10: Verify Tailscale Routing
 - Step 11: Reconfigure Remote ATA for Deployment
 - Step 12: Verify Remote SIP Registration
-- Step 13: Test Remote Setup Through Tunnel
-- Step 14: Deploy to Remote Site
+- Step 13: Deploy to Remote Site
 
 **Final Steps:**
-- Step 15: Reboot Test
-- Step 16: Make a Test Call
-- Step 17: Export Backups
-- Optional: Wireless Setup with Beryl AX
+- Step 14: Reboot Test
+- Step 15: Make a Test Call
+- Step 16: Export Backups
+- Optional: Wireless Setup with Beryl AX (Remote Sites)
 
 ---
 
@@ -573,36 +572,7 @@ If not registered, wait 1-2 minutes or reboot the ATA.
 
 ---
 
-## Step 13: Test Remote Setup Through Tunnel
-
-Before shipping the remote Brume and ATA, test everything locally to confirm it works through the Tailscale tunnel.
-
-### Make a Test Call
-
-1. With the remote Brume connected to your local network (WAN port to your router)
-2. ATA connected to the remote Brume's LAN port
-3. Phone connected to the ATA
-4. Pick up the phone - you should hear dial tone
-5. Dial the main site extension (e.g., 100)
-6. The main site phone should ring
-7. Answer and verify two-way audio works
-
-### Troubleshooting
-
-If no dial tone:
-- Check ATA registration in the ATA's web interface
-- Verify Tailscale routing (Step 10)
-- Check firewall configuration (Step 9)
-
-If dial tone but call doesn't connect:
-- Verify extension numbers match FreePBX configuration
-- Check FreePBX logs for errors
-
-Once the test call succeeds, the remote setup is ready for deployment.
-
----
-
-## Step 14: Deploy to Remote Site
+## Step 13: Deploy to Remote Site
 
 Once pre-configured and tested locally, deployment is simple:
 
@@ -613,7 +583,17 @@ Once pre-configured and tested locally, deployment is simple:
 5. Power on - the Brume will automatically connect to Tailscale
 6. Test by calling between the remote phone and main site phone
 
-If anything goes wrong, you can SSH to the Brume via its Tailscale IP from your computer (with Tailscale client running and logged in).
+### Remote Administration
+
+If anything goes wrong, you can access the Brume remotely via its Tailscale IP:
+
+1. Visit the [Tailscale admin console](https://login.tailscale.com/admin/machines)
+2. Find the Brume 2 you need to access
+3. Click the dropdown arrow next to the Tailscale IP address and click the copy icon
+4. Make sure the Tailscale client app is running and logged in on your computer
+5. Paste that IP address into a new browser tab - you're now logged into the Brume 2 web admin remotely
+6. To access the ATA, go to the **Clients** tab in the Brume 2 admin to find the ATA's IP address
+7. Copy that IP and paste it into a new browser tab to access the ATA's web admin
 
 ---
 
@@ -621,7 +601,7 @@ If anything goes wrong, you can SSH to the Brume via its Tailscale IP from your 
 
 ---
 
-## Step 15: Reboot Test
+## Step 14: Reboot Test
 
 Verify everything survives a power cycle:
 
@@ -641,7 +621,7 @@ If registration fails after reboot, check:
 
 ---
 
-## Step 16: Make a Test Call
+## Step 15: Make a Test Call
 
 The ultimate test - pick up the phone and make a call!
 
@@ -657,11 +637,10 @@ If you don't hear dial tone:
 
 If you hear dial tone but calls don't connect:
 - Verify the dial plan on the ATA allows the numbers you're dialing
-- Check FreePBX outbound routes if calling external numbers
 
 ---
 
-## Step 17: Export Backups
+## Step 16: Export Backups
 
 Save a backup of each Brume configuration:
 
@@ -676,9 +655,9 @@ Store backups safely - they can restore the full configuration if needed.
 
 ---
 
-## Optional: Wireless Setup with Beryl AX
+## Optional: Wireless Setup with Beryl AX (Remote Sites)
 
-If you don't want to place the phone right next to the router or need to avoid running ethernet or phone cables to where you want the phone, you can use a wireless subnet router instead: the [GL.iNet Beryl AX (GL-MT3000)](https://www.gl-inet.com/products/gl-mt3000/).
+For remote sites where you don't want to place the phone right next to the router or need to avoid running cables, you can use a wireless subnet router instead: the [GL.iNet Beryl AX (GL-MT3000)](https://www.gl-inet.com/products/gl-mt3000/).
 
 The Beryl AX connects wirelessly to the remote site's existing WiFi router, then provides a wired ethernet port for the ATA. This lets you place the phone anywhere with a power outlet and WiFi coverage.
 
@@ -736,7 +715,7 @@ Once connected to WiFi or Ethernet, configure Tailscale on the Beryl AX the same
 | `/etc/config/tailscale` | GL.iNet Tailscale settings |
 | `/etc/tailscale/tailscaled.state` | Tailscale auth state |
 
-### Essential Commands
+### Essential Commands (Brume 2/Beryl AX)
 
 ```bash
 # Check Tailscale status
@@ -757,6 +736,32 @@ iptables -t nat -L POSTROUTING -n -v | grep MASQ
 
 # Restart firewall (also runs firewall.user)
 /etc/init.d/firewall restart
+```
+
+### Essential Commands (RasPBX)
+
+```bash
+# Check registered extensions
+asterisk -rx "pjsip show endpoints"
+# or for chan_sip:
+asterisk -rx "sip show peers"
+
+# Monitor SIP activity in real-time
+asterisk -rx "pjsip set logger on"
+# Type Control+C to exit
+
+# Live console with verbosity (more v's = more detail)
+asterisk -rvvvv
+# Type "quit" or "exit" to leave
+
+# Check active calls
+asterisk -rx "core show calls"
+
+# View recent call history
+asterisk -rx "core show channels verbose"
+
+# Restart Asterisk (if needed)
+systemctl restart asterisk
 ```
 
 ### Firewall Configuration Differences
