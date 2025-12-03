@@ -1,0 +1,103 @@
+{
+  "summary": "User needed remote SSH and SMB access to an OMV NAS on a 192.168.1.x LAN via a Brume 2 running Tailscale, but overlapping subnets at both sites prevented direct routing. We confirmed the Brume as a working subnet router, diagnosed the overlapping-LAN issue, and solved it by using the Brume as a jump host (for SSH) and as an SSH tunnel endpoint (for SMB).",
+  "network_context": {
+    "site_topology": {
+      "omv_site": {
+        "lan_subnet": "192.168.1.0/24 (implied)",
+        "omv_host": "192.168.1.231",
+        "brume_2_connection": "Brume 2 and OMV both plugged into the main router (siblings on the same LAN)",
+        "tailscale_on_brume": true,
+        "tailscale_on_omv": false
+      },
+      "remote_site": {
+        "client": "Mac with Tailscale desktop client",
+        "likely_lan_conflict": "Remote Mac is also on a 192.168.1.0/24 network, causing subnet overlap with OMV site"
+      }
+    },
+    "key_concept_overlapping_subnets": {
+      "problem": "Both locations use 192.168.1.0/24, so the Mac routes 192.168.1.x locally instead of using the Tailscale route via Brume.",
+      "effect": "Ping/SSH to 192.168.1.231 from the Mac fails, even though Brume can reach OMV and is advertising the route."
+    }
+  },
+  "tailscale_brume_settings": {
+    "brume_tailscale_status": {
+      "tailscale_enabled": true,
+      "device_role": "Subnet router for LAN segments reachable from it",
+      "reachable_from_remote": true
+    },
+    "glinet_ui_settings": {
+      "allow_remote_access_lan": true,
+      "allow_remote_access_wan": true,
+      "rationale": "Because OMV and other devices are on the main router (Brume WAN side), 'Allow Remote Access WAN' must be enabled to expose 192.168.1.0/24."
+    },
+    "tailscale_admin_routes": {
+      "advertised_subnet": "192.168.1.0/24",
+      "route_enabled": true,
+      "verification": "Tailscale admin console showed 192.168.1.0/24 enabled for the Brume 2."
+    },
+    "connectivity_checks": {
+      "from_brume": {
+        "ping_omv": "success",
+        "conclusion": "Brume ↔ OMV connectivity on 192.168.1.231 works."
+      },
+      "from_remote_mac": {
+        "ping_omv": "fails (times out)",
+        "ping_brume": "succeeds",
+        "conclusion": "Mac ↔ Brume over Tailscale is fine, but Mac doesn’t send 192.168.1.x traffic through Tailscale due to local subnet conflict."
+      }
+    }
+  },
+  "problems_diagnosed": [
+    "User could SSH and web-admin into Brume 2 remotely over Tailscale but not reach OMV at 192.168.1.231.",
+    "Brume could ping OMV successfully, so the issue was not between Brume and OMV.",
+    "Tailscale route 192.168.1.0/24 was already enabled for the Brume.",
+    "Root cause: overlapping LANs (remote Mac’s local network also 192.168.1.0/24), so the OS prefers its local route instead of the Tailscale subnet route."
+  ],
+  "solutions": {
+    "ssh_access": {
+      "approach": "Use Brume as a jump host.",
+      "methods": {
+        "two_step_method": {
+          "description": "First SSH to Brume, then SSH from Brume to OMV.",
+          "commands": [
+            "ssh root@BRUME_TAILSCALE_NAME_OR_IP",
+            "ssh YOUR_OMV_USER@192.168.1.231"
+          ]
+        },
+        "single_command_jump": {
+          "description": "Use SSH’s -J option to jump through Brume in one command.",
+          "command_example": "ssh -J root@BRUME_TAILSCALE_NAME_OR_IP YOUR_OMV_USER@192.168.1.231"
+        }
+      },
+      "result": "User successfully obtained SSH access to OMV remotely via Brume."
+    },
+    "smb_access": {
+      "approach": "Create an SSH tunnel on the Mac through Brume to OMV’s SMB port, then connect via smb://localhost:PORT.",
+      "ssh_tunnel": {
+        "command": "ssh -L 1445:192.168.1.231:445 root@BRUME_TAILSCALE_NAME_OR_IP",
+        "behavior": "Keeps a local listener on the Mac at localhost:1445 that forwards to OMV’s 445 via Brume.",
+        "requirement": "SSH session must remain open for the SMB tunnel to stay active."
+      },
+      "mac_smb_connection": {
+        "finder_steps": [
+          "With the SSH tunnel running, open Finder → Go → Connect to Server… (⌘K).",
+          "Enter smb://localhost:1445 or smb://localhost:1445/SHARENAME as the server address.",
+          "Authenticate with OMV SMB credentials when prompted."
+        ],
+        "result": "Mac mounts OMV’s SMB share via localhost:1445, tunneled through Brume."
+      }
+    }
+  },
+  "key_concepts": [
+    "A GL.iNet Brume 2 running Tailscale can act as a subnet router and expose LAN/WAN subnets (like 192.168.1.0/24) to the tailnet.",
+    "If both ends of a Tailscale connection use the same private subnet (e.g., 192.168.1.0/24), the client’s OS will prefer local routing over the Tailscale subnet route, breaking direct access to the remote LAN.",
+    "Using the subnet router device (Brume) as a jump host bypasses subnet conflicts because the LAN-side connection to OMV happens from the Brume, not from the overlapping client subnet.",
+    "SSH port forwarding (-L) can be used to tunnel non-SSH protocols like SMB through a Tailscale-accessible device."
+  ],
+  "future_improvements": [
+    "Change one site’s LAN to a different subnet (e.g., 192.168.50.0/24) to eliminate the overlapping 192.168.1.0/24 problem.",
+    "Update the Brume’s advertised subnet in Tailscale to match the new LAN (e.g., 192.168.50.0/24) and re-enable the route.",
+    "Once subnets no longer overlap, connect directly to OMV from remote devices without SSH jump/tunnels (e.g., ssh YOUR_OMV_USER@192.168.50.231 or smb://192.168.50.231/SHARE).",
+    "Optionally set up MagicDNS or DNS overrides so OMV can be reached via a friendly hostname instead of its IP."
+  ]
+}

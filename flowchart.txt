@@ -1,0 +1,143 @@
+Your system has two independent failure points after any power event:
+
+  | Layer        | Device  | What Can Break                                               |
+  |--------------|---------|--------------------------------------------------------------|
+  | Network Path | Brume 2 | Tailscale routes, iptables rules, /32 route to 192.168.1.142 |
+  | Phone Config | ATA     | Gateway IP, SIP server setting, static IP                    |
+
+  Both must be correct for registration to work. The symptoms look identical (ATA shows
+  "Not Registered"), but the fix is completely different.
+
+  ---
+  Troubleshooting Decision Tree
+
+  When an extension stops registering:
+
+  START: Extension X not registered
+             │
+             ▼
+  ┌─────────────────────────────┐
+  │ STEP 1: Identify the site   │
+  │ Which Brume + ATA combo?    │
+  └─────────────────────────────┘
+             │
+             ▼
+  ┌─────────────────────────────┐
+  │ STEP 2: Check ATA web UI    │
+  │ Can you access ATA at its   │
+  │ expected local IP?          │
+  └─────────────────────────────┘
+             │
+       ┌─────┴─────┐
+       ▼           ▼
+     [YES]       [NO]
+       │           │
+       │           └──▶ ATA has wrong IP or is offline
+       │                → Check ATA got DHCP/static correctly
+       │                → Power cycle ATA, check again
+       ▼
+  ┌─────────────────────────────┐
+  │ STEP 3: In ATA UI, verify:  │
+  │ • Gateway = Brume LAN IP    │
+  │ • SIP Proxy = 192.168.1.142 │
+  │ • Static IP correct         │
+  └─────────────────────────────┘
+             │
+       ┌─────┴─────┐
+       ▼           ▼
+   [CORRECT]   [WRONG]
+       │           │
+       │           └──▶ ATA lost settings after power loss
+       │                → Reconfigure ATA
+       │                → SAVE CONFIG properly
+       ▼
+  ┌─────────────────────────────┐
+  │ STEP 4: SSH to Brume        │
+  │ Test: ping 192.168.1.142    │
+  └─────────────────────────────┘
+             │
+       ┌─────┴─────┐
+       ▼           ▼
+   [SUCCESS]    [FAIL]
+       │           │
+       │           └──▶ Brume can't reach PBX
+       │                → Go to BRUME FIX section
+       ▼
+  ┌─────────────────────────────┐
+  │ STEP 5: From Brume, check   │
+  │ ip route get 192.168.1.142  │
+  │ Does it go via tailscale0?  │
+  └─────────────────────────────┘
+             │
+       ┌─────┴─────┐
+       ▼           ▼
+     [YES]       [NO]
+       │           │
+       │           └──▶ Route missing after reboot
+       │                → Re-add: ip route add 192.168.1.142/32 dev tailscale0
+       │                → Check /etc/rc.local for persistence
+       ▼
+  ┌─────────────────────────────┐
+  │ STEP 6: Check firewall      │
+  │ iptables -L FORWARD -n -v   │
+  │ Is tailscale0↔br-lan open?  │
+  └─────────────────────────────┘
+             │
+       ┌─────┴─────┐
+       ▼           ▼
+     [YES]       [NO]
+       │           │
+       │           └──▶ Firewall rules missing
+       │                → Re-add iptables FORWARD rules
+       │                → Check /etc/firewall.user
+       ▼
+  ┌─────────────────────────────┐
+  │ STEP 7: On PBX, run:        │
+  │ tcpdump -i any port 5060    │
+  │ Do you see REGISTER from    │
+  │ the ATA's subnet?           │
+  └─────────────────────────────┘
+             │
+       ┌─────┴─────┐
+       ▼           ▼
+     [YES]       [NO]
+       │           │
+       │           └──▶ Packets not reaching PBX
+       │                → Problem is Brume routing/firewall
+       │                → Re-run all manual commands
+       ▼
+  ┌─────────────────────────────┐
+  │ STEP 8: Check Asterisk      │
+  │ asterisk -rx "sip show      │
+  │ peers" on the Pi            │
+  │ Is extension showing?       │
+  └─────────────────────────────┘
+
+  ---
+  Quick Reference: Commands per Site
+
+  | Site        | SSH to                   | Check route                | ATA IP to verify
+  |
+  |-------------|--------------------------|----------------------------|------------------
+  |
+  | gl-mt2500-b | ssh root@100.77.242.75   | ip route get 192.168.1.142 | 192.168.50.133
+  |
+  | gl-mt2500-d | ssh root@100.76.158.115  | ip route get 192.168.1.142 | 192.168.9.217
+  |
+  | gl-mt2500-j | ssh root@100.103.207.125 | ip route get 192.168.1.142 | 192.168.8.121
+  |
+
+  ---
+  Does This Need Project Management?
+
+  Yes, but lightweight. Here's why:
+
+  You have a hardening project, not just troubleshooting. The real fix is:
+
+  1. Persist Brume configs - Ensure /etc/rc.local or /etc/firewall.user contains all manual
+   commands
+  2. Export ATA configs - Backup each ATA's settings so you can restore after resets
+  3. Document the "known good" state for each site
+
+  This is maybe 2-4 hours of focused work per site, but it eliminates the "roll of the
+  dice" after every power event.

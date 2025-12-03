@@ -1,0 +1,197 @@
+Here’s a summary of the issues I have been having with networking the Brume 2s together and letting the ATAs communicate, plus the Tailscale IPs info.
+I need a concrete, repeatable troubleshooting plan for when one phone stops working, either because it can't register because of an ATA setting or the ATA can't reach the PBX because of a Brume 2 routing setting.  Also, there is one aspect of the  Brume 2 routing that gets erased when it gets power cut accidentally.
+
+
+Topology (current picture)
+
+MACHINE        TAILSCALE IP       EXPIRY   SUBNETS   EXIT NODE   VERSION              KERNEL         STATUS     Connected ATA local IP  ATA model       Phone extension number
+-----------    --------------     -------  --------  ---------   --------------------  -------------  ---------  ----------------------  -------------  ----------------------
+gl-mt2500      100.125.94.29      disabled yes       yes         1.66.4-1 (OpenWrt)    Linux 5.4.211  Connected  192.168.1.106           Linksys PAP2T  102, 103
+Raspberry Pi   n/a                n/a      n/a       n/a         Asterisk 16.13.0 &    n/a           Connected  192.168.1.142           n/a            (PBX host only)
+                                                                  FreePBX 15.0.16.75,
+                                                                  Raspbian Buster Lite
+gl-mt2500-b    100.77.242.75      disabled yes       no          1.66.4-1 (OpenWrt)    Linux 5.4.211  Connected  192.168.50.133          Cisco SPA2102  105
+gl-mt2500-d    100.76.158.115     disabled yes       no          1.66.4-1 (OpenWrt)    Linux 5.4.211  Connected  192.168.9.217           Cisco SPA112   104, 107
+gl-mt2500-j    100.103.207.125    disabled yes       no          1.66.4-1 (OpenWrt)    Linux 5.4.211  Connected  192.168.8.121           Cisco SPA2102  106
+
+Goal: all ATAs (local and remote) stay registered to the PBX at 192.168.1.142, even if a Brume 2 or ATA loses power and reboots.
+
+What’s solid / mostly stable
+
+- Local site:
+  - PAP2T at 192.168.1.106 (ext 102, 103) registers to the PBX at 192.168.1.142 and behaves normally.
+  - When there are no Brume / Tailscale complications, Asterisk + FreePBX work fine.
+
+- Basic Brume config:
+  - Each Brume is set up as a Tailscale node, advertising its local ATA subnet.
+  - Each home/site uses a distinct LAN subnet (192.168.1.x, 192.168.50.x, 192.168.9.x, 192.168.8.x) to avoid overlapping routes.
+  - Brumes are meant to be “transparent” for local LAN: the main router does DHCP; Brume is a Tailscale bridge/subnet router.
+
+- In at least one case (gl-mt2500-d / 192.168.9.217), with routes and firewall tuned, remote extension 104 has successfully registered and made calls to the PBX across Tailscale.
+
+Where things go wrong after power loss or reboot
+
+1) Brume 2 → Tailscale routes and firewall rules
+
+- Some of the critical connectivity on the Brumes has been done as:
+  - Manual ip route commands (e.g., a /32 route to 192.168.1.142 via tailscale0).
+  - Manual iptables FORWARD rules between tailscale0 and br-lan.
+- These commands work immediately but are NOT automatically re-run after a reboot unless they are in rc.local or /etc/firewall.user and those files are preserved exactly.
+- Tailscale itself can “forget” specific parameters (like advertise-routes and accept-routes) if it was brought up with a one-off tailscale up --reset without matching persistent config.
+
+Result after a Brume reboot:
+- Tailscale may come up, but not:
+  - Advertise the LAN subnet correctly, or
+  - Accept routes from the PBX side, or
+  - Have the forced /32 route to 192.168.1.142.
+- The firewall might not be forwarding tailscale0 ↔ br-lan properly if iptables rules weren’t persisted correctly.
+- From the ATA’s point of view, nothing changed locally, but:
+  - Packets to the PBX never leave the LAN,
+  - Or they go out the wrong interface (WAN instead of tailscale0),
+  - Or they are blocked by firewall rules.
+
+Symptoms:
+- The ATA shows line status “Not Registered” or keeps retrying.
+- tcpdump on the PBX shows no REGISTER packets from the remote ATA IP.
+- When you manually re-run the ip route / iptables / tailscale up commands, everything suddenly starts working again.
+
+2) ATA → local gateway and SIP target
+
+- ATAs are fairly dumb about routing:
+  - They need a correct static IP (or reservation), subnet mask, and default gateway (the Brume or main router on that LAN).
+  - They need the SIP server set to 192.168.1.142 (PBX) or a name that resolves to that IP.
+- If power glitches or factory-reset conditions occur (even partial), some ATAs:
+  - Drop back to DHCP with unpredictable addresses.
+  - Lose their configured gateway or DNS.
+  - Lose the SIP server setting or reset ports.
+
+Result after ATA reboot or power loss:
+- The ATA may still have a valid LAN IP but:
+  - Gateway is wrong (e.g., 0.0.0.0), so it cannot reach the PBX route.
+  - SIP server is empty or wrong, so no REGISTER is even attempted to 192.168.1.142.
+- You see the same symptom as with a Brume routing issue: PBX sees nothing from that ATA IP, even though the ATA UI is up.
+
+3) “It worked once, then broke after the next reboot”
+
+This pattern is exactly what you care about:
+
+- Scenario:
+  - You configure Brume and ATA carefully.
+  - You run manual commands (routes, iptables, tailscale up).
+  - Everything works: remote ATA registers, calls succeed.
+- Later:
+  - The Brume loses power and reboots, or the ATA does, or both.
+  - Tailscale comes up, but the “glue” (manual routes/iptables/flags) does not.
+  - Some ATAs may also lose pieces of their config (especially if they were never saved to flash or were on the edge of a reset).
+
+The combined effect:
+- You end up with ATAs whose settings LOOK unchanged when you log in, but the path to the PBX is broken:
+  - Either because of missing routes/firewall on the Brume, or
+  - Incorrect/default gateway or SIP proxy on the ATA (post-reset).
+
+How this maps to your current devices
+
+- gl-mt2500 + PAP2T:
+  - Generally stable, because it’s on the same LAN as the PBX and does not rely on Tailscale routing for that leg.
+
+- gl-mt2500-b + SPA2102 (ext 105):
+  - Relies entirely on:
+    - Brume’s Tailscale routes being correct, and
+    - Brume’s firewall forwarding tailscale0 ↔ br-lan.
+  - If Brume’s Tailscale or firewall state isn’t fully restored after reboot, SPA2102 can’t reach the PBX, even with correct ATA config.
+
+- gl-mt2500-d + SPA112 (ext 104, 107):
+  - You have seen a case where routing (Brume ↔ PBX) was fixed, but PBX still saw no REGISTERs.
+  - That points to fragile SPA112 settings (gateway, DNS, SIP proxy).
+  - Any partial reset or unsaved change on SPA112 can mean: after the next power loss, it quietly stops sending SIP packets.
+
+- gl-mt2500-j + SPA2102 (ext 106):
+  - Very similar risks:
+    - Needs the Brume’s Tailscale / firewall settings to be fully in place.
+    - Needs the SPA2102 to retain correct network + SIP server settings across reboots.
+
+The core problem in plain terms
+
+- The system depends on both:
+  1) Brumes coming back from power loss with the same Tailscale routes, firewall rules, and forced /32 routes to 192.168.1.142; and
+  2) ATAs coming back from power loss with the same static IP, gateway, DNS, and SIP server pointing at the PBX.
+
+- Right now, some of those pieces are “hand-applied” or fragile:
+  - Manual shell commands on the Brumes that may not be fully persisted.
+  - ATA configs that may not have been saved properly or may be prone to resetting.
+
+Because of that, every power glitch is a roll of the dice:
+- If both sides come up 100% exactly as before: everything works.
+- If either side loses even one crucial setting: ATAs stop registering, and it looks like a mysterious intermittent network problem.
+
+(If you want, next step could be a checklist-style “hardening plan” that’s all about making sure:  
+- Brume boot scripts recreate the exact Tailscale, route, and firewall state;  
+- Each ATA has its config saved and exported, so you can re-import or re-provision it after any power event.)
+
+
+Overall goal with UCI
+- Use `uci` to:
+  - Inspect how the Brume 2 is wired internally (network + firewall).
+  - Understand how Tailscale (`tailscale0`) and the LAN/WAN zones are defined.
+  - Make small, careful edits and then restart firewall/network to test ATA + PBX connectivity.
+
+Main things we’ve actually done with `uci`
+
+1) Used UCI to inspect network config
+- Commands in this family (read-only):
+  - `uci show network`
+  - Sometimes narrowed down, e.g. `uci show network.lan`, `uci show network.wan`
+- What we were looking for:
+  - The LAN IP and subnet of each Brume 2.
+  - Which physical interface(s) are in `lan` and `wan`.
+  - Whether there are any extra/legacy interfaces that might confuse routing.
+- How it related to Ir problem:
+  - Helped confirm that the Brume’s LAN is on e.g. 192.168.x.x and that the Pi + ATA really are on that same subnet.
+  - Provided context for why a `ip route get` to a private IP might be going out `tailscale0` instead of the LAN.
+
+2) Used UCI to inspect firewall zones and rules
+- Commands in this family (read-only):
+  - `uci show firewall`
+  - Sometimes narrowed, e.g. `uci show firewall.@zone[0]`, `uci show firewall.@zone[1]`
+- What we were looking for:
+  - Definitions of `lan` and `wan` zones.
+  - Whether `tailscale0` was attached to any zone.
+  - Any special rules or forwards that might affect SIP/RTP or access between Tailscale and LAN.
+- How it related:
+  - We tied this into the warnings I saw when running `/etc/init.d/firewall restart`.
+  - The UCI view helped us see that some services (like glnas / samba share sections) were partially configured and generating warnings.
+  - This fed into our suspicion that firewall/zone configuration wasn’t entirely clean, which can block or mis-route ATA traffic.
+
+3) Used UCI to reason about Tailscale integration (even if changes were minimal)
+- We used `uci show` output to:
+  - Confirm whether `tailscale0` was explicitly mentioned in `network` or `firewall` config.
+  - Decide whether the “right” fix would be to:
+    - Add `tailscale0` to the `lan` zone, or
+    - Create a dedicated Tailscale zone and allow forwarding between that zone and `lan`.
+- In other words, UCI was our “source of truth” for how OpenWrt *thought* the interfaces and zones were wired.
+
+4) Committing changes and restarting services (where applicable)
+- After any change made with UCI (where I did apply edits), the typical pattern was:
+  - `uci commit network` or `uci commit firewall`
+  - Then:
+    - `/etc/init.d/network restart` (for network changes)
+    - `/etc/init.d/firewall restart` (for firewall changes)
+- This is what triggered the firewall warning messages we saw, which further motivated cleaning up the config.
+
+What we have *not* done heavily with UCI (based on what I can see)
+- We have not done a full, aggressive rewrite of:
+  - All firewall zones
+  - All network interfaces
+- Most of the UCI usage so far has been:
+  - Inspect → understand → do very limited edits (if any), then test.
+- The heavy lifting in troubleshooting has been:
+  - Checking routes (`ip route get`, `ip a`, `ip r`)
+  - Testing connectivity (`ping`, `curl`, ATA registration behavior)
+  - Restarting firewall and network, watching what breaks or starts working.
+
+In short
+- UCI has mainly been Ir **inspection and light-edit tool** on the Brume 2/OpenWrt side:
+  - To see how `network` and `firewall` are set up.
+  - To confirm or tweak how Tailscale (`tailscale0`) relates to `lan` and `wan`.
+  - To commit small changes and restart services while testing ATA ↔ PBX connectivity.
+- The remaining issues (overlapping subnets, routes going out `tailscale0` for local IPs, and messy firewall sections) are all visible through the UCI configs we’ve been poking at, even if we haven’t completely cleaned them up yet.
