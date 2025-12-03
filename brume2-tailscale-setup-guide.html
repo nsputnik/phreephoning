@@ -1,273 +1,169 @@
-<h2>Phreephoneing: A Free, Private, Encrypted Phone System with Raspberry Pi and Analog Phones</h2>
+<style>
+.code-box {
+    background-color: #f4f4f4;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 12px;
+    margin: 10px 0;
+    overflow-x: auto;
+    position: relative;
+}
+.copy-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 4px 8px;
+    font-size: 12px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.copy-btn:hover {
+    background-color: #e9e9e9;
+}
+.code-box code {
+    white-space: pre;
+    display: block;
+}
+.note {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 10px 15px;
+    margin: 10px 0;
+}
+.important {
+    background-color: #f8d7da;
+    border-left: 4px solid #dc3545;
+    padding: 10px 15px;
+    margin: 10px 0;
+}
+table {
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+th {
+    background-color: #f4f4f4;
+}
+</style>
 
-<p>What if you could pick up an old-school telephone in your house, call a friend's house across town, the country or world, and have that call travel over your existing internet connection, fully encrypted, with no monthly bill from a phone company? That's the basic idea behind this project. Phreephoneing is a free, private phone system built from Raspberry Pis, Analog Telephone Adapters (ATAs), and a router that creates an encrypted mesh between locations.</p>
+<p>What if you could pick up an old-school telephone in your house, call a friend's house across town, the country or world, and have that call travel over your existing internet connection, fully encrypted, with no monthly bill from a phone company? That's the basic idea behind this project. Phreephoneing is a free, private phone system built from a Raspberry Pis, Analog Telephone Adapters (ATAs), subnet routers, and a main router that creates an encrypted mesh between locations.</p>
 
 <h2>WRT Powered Subnet Router / Tailscale Setup Guide for VoIP ATAs</h2>
 
-<p>This guide covers setting up a GL.iNet Brume 2 router with Tailscale to connect remote ATAs to a central PBX for free, private and encrypted phone system. It is not connected to the larger phone system. You can only call the users you set up with the system. You don't have to pay a phone company monthly, just your ISP. Wireguard encrypts the traffic between subnet routers, just like the major data centers do.</p>
+<p>This guide covers setting up a GL.iNet Brume 2/Beryl AX router with Tailscale to connect remote ATAs to a central PBX for free, private and encrypted phone system. It is not connected to the larger phone system. You can only call the users you set up with the system. You don't have to pay a phone company monthly, just your ISP. Wireguard encrypts the traffic between subnet routers, just like the major data centers do.</p>
 
-<h3>Overview</h3>
+<h2>Overview</h2>
 
-<!-- Add your network diagram image here -->
+<p>[INSERT DIAGRAM IMAGE HERE]</p>
 
-<h3>Prerequisites</h3>
+<h2>Prerequisites</h2>
 
 <ul>
-  <li><a href="https://www.gl-inet.com/products/gl-mt2500/">GL.iNet Brume 2 (GL-MT2500)</a> router, one for each remote line and one for the main site that will be on the same local network as the PBX</li>
-  <li><a href="https://tailscale.com/">Tailscale account</a> (free tier is adequate)</li>
-  <li>Tailscale client installed on your admin computer - <a href="https://tailscale.com/download">download from Tailscale</a> and sign in with the same Tailscale account. This allows you to SSH into any Brume via its Tailscale IP and also into each ATA admin. You will be on the same Tailnet.</li>
-  <li>A Raspberry Pi 3, 4, or 5 (not Zero) with <a href="http://www.raspbx.org/downloads/">RasPBX image</a> written to the microSD card</li>
-  <li>An <a href="https://www.ebay.com/sch/i.html?_nkw=analog+telephone+adapter">ATA device</a> for each line (Cisco SPA, Linksys PAP2T, Grandstream HT802, etc.)</li>
-  <li>An old touch tone analog telephone at each location you want to call or you want to call you</li>
+<li>A broadband internet connection at the main site and each remote site (no telephone line needed—this system is completely independent from the telecom network)</li>
+<li>An existing wireless router with internet access at the main site and at each remote site (the Brume 2/Beryl AX connects to these routers)</li>
+<li><a href="https://www.gl-inet.com/products/gl-mt2500/">GL.iNet Brume 2 (GL-MT2500)</a> router, one for each remote line and one for the main site that will be on the same local network as the PBX, or <a href="https://www.gl-inet.com/products/gl-mt3000/">GL.iNet Beryl AX (GL-MT3000)</a> which is the wireless version, great to use when one of your remote line users does not want to place the phone next to the router, but to another location without having to run ethernet cables. When we mention the remote Brume 2 and Tailscale, the Beryl AX can be substituted here, but we'll go into the wireless details in a separate section near the end.</li>
+<li><a href="https://tailscale.com/">Tailscale account</a> (free tier is adequate)</li>
+<li>Tailscale client installed on your admin computer - download from <a href="https://tailscale.com/download">https://tailscale.com/download</a> and sign in with the same Tailscale account. This allows you to SSH into any Brume via its Tailscale IP and also into each ATA admin. You will be on the same Tailnet.</li>
+<li>A Raspberry Pi 3, 4, or 5 (not Zero) with <a href="http://www.raspbx.org/downloads/">RasPBX image</a> written to the microSD card</li>
+<li>An <a href="https://www.ebay.com/sch/i.html?_nkw=analog+telephone+adapter">ATA device</a> for each line (Cisco SPA, Linksys PAP2T, Grandstream HT802, etc.)</li>
+<li>An old touch tone analog telephone at each location you want to call or you want to call you.</li>
 </ul>
 
-<hr>
+<h2>Steps</h2>
 
-<h2>Step 1A: Main Site Brume 2 Setup</h2>
+<p><strong>Main Site Setup (do these first):</strong></p>
+<ul>
+<li><a href="#step1">Step 1: Main Site Brume 2 Setup</a></li>
+<li><a href="#step2">Step 2: Main Site Firewall Configuration</a></li>
+<li><a href="#step3">Step 3: Reserve PBX IP Address</a></li>
+<li><a href="#step4">Step 4: Create Extensions in FreePBX</a></li>
+<li><a href="#step5">Step 5: Configure Main Site ATA</a></li>
+<li><a href="#step6">Step 6: Verify Main Site SIP Registration</a></li>
+<li><a href="#step7">Step 7: Configure and Test Remote ATA Locally</a></li>
+</ul>
+
+<p><strong>Remote Site Setup (repeat for each remote location):</strong></p>
+<ul>
+<li><a href="#step8">Step 8: Remote Site Brume 2 Setup</a></li>
+<li><a href="#step9">Step 9: Remote Site Firewall Configuration</a></li>
+<li><a href="#step10">Step 10: Verify Tailscale Routing</a></li>
+<li><a href="#step11">Step 11: Reconfigure Remote ATA for Deployment</a></li>
+<li><a href="#step12">Step 12: Verify Remote SIP Registration</a></li>
+<li><a href="#step13">Step 13: Test Remote Setup Through Tunnel</a></li>
+<li><a href="#step14">Step 14: Deploy to Remote Site</a></li>
+</ul>
+
+<p><strong>Final Steps:</strong></p>
+<ul>
+<li><a href="#step15">Step 15: Reboot Test</a></li>
+<li><a href="#step16">Step 16: Make a Test Call</a></li>
+<li><a href="#step17">Step 17: Export Backups</a></li>
+<li><a href="#optional-wireless">Optional: Wireless Setup with Beryl AX</a></li>
+</ul>
+
+<h2>Main Site Setup</h2>
+
+<p>Complete all main site steps before setting up any remote sites.</p>
+
+<a name="step1"></a>
+<h2>Step 1: Main Site Brume 2 Setup</h2>
 
 <p>The main site Brume 2 sits on the same local network as the PBX and acts as the Tailscale gateway for remote sites. It stays in <strong>Router mode</strong> (the default) but connects differently than remote Brumes.</p>
 
-<blockquote><strong>Set up the main Brume first!</strong> The main Brume must be configured and advertising its subnet before remote Brumes can connect to the PBX.</blockquote>
+<div class="important"><strong>Set up the main Brume first!</strong> The main Brume must be configured and advertising its subnet before remote Brumes can connect to the PBX.</div>
 
 <h3>Initial Setup</h3>
 
 <ol>
-  <li>At your local site where the PBX will live, connect Brume 2 <strong>WAN port</strong> to your router (gets internet and local network via DHCP)</li>
-  <li>The PBX and local ATA connect to the <strong>same network as the Brume's WAN</strong> (not the LAN port), so just connect them to your router</li>
-  <li>Access Brume web UI (default: <code>http://192.168.8.1</code>)</li>
-  <li>Set admin password</li>
-  <li>Leave Network Mode as <strong>Router</strong> (the default)</li>
-  <li>Note the Brume's WAN IP (check your router's DHCP client list)</li>
+<li>At your local site where the PBX will live, connect Brume 2 <strong>WAN port</strong> to your router (gets internet and local network via DHCP)</li>
+<li>The PBX and local ATA connect to the <strong>same network as the Brume's WAN</strong> (not the LAN port), so just connect them to your router</li>
+<li>Access Brume web UI (default: http://192.168.8.1)</li>
+<li>Set admin password</li>
+<li>Leave Network Mode as <strong>Router</strong> (the default)</li>
+<li>Note the Brume's WAN IP (check your router's DHCP client list)</li>
 </ol>
 
 <h3>Enable Tailscale and Join Tailnet</h3>
 
 <ol start="7">
-  <li>In Brume web UI: <strong>VPN → Tailscale</strong></li>
-  <li>Click <strong>Enable Tailscale</strong></li>
-  <li>Click the authentication link and log into your Tailscale account</li>
-  <li>Enable <strong>"Allow Remote Access LAN"</strong></li>
-  <li>Enable <strong>"Allow Remote Access WAN"</strong></li>
-  <li>Note the Tailscale IP assigned (100.x.x.x) - visible in Tailscale admin console</li>
+<li>In Brume web UI: <strong>Applications → Tailscale</strong></li>
+<li>Click <strong>Enable Tailscale</strong></li>
+<li>Click the authentication link and log into your Tailscale account</li>
+<li>Enable <strong>"Allow Remote Access LAN"</strong></li>
+<li>Enable <strong>"Allow Remote Access WAN"</strong></li>
+<li>Note the Tailscale IP assigned (100.x.x.x) - visible in Tailscale admin console</li>
 </ol>
 
-<h3>Configure Main Brume (via SSH)</h3>
+<h3>Approve Route and Name Device</h3>
 
 <ol start="13">
-  <li>SSH to the main Brume: <code>ssh root@192.168.8.1</code> (the default LAN IP, password is same as web UI) or use the Tailscale IP once it's connected</li>
-  <li>Create the UCI firewall zone (see Reference A)</li>
-  <li>Configure <code>/etc/rc.local</code> using the <strong>Main Site version</strong> (see "Main Site Brume Setup" section at end of guide)</li>
-  <li>Configure <code>/etc/firewall.user</code> using the <strong>Main Site version</strong> (uses <code>eth0</code> instead of <code>br-lan</code>)</li>
-  <li>Apply settings: <code>tailscale up --advertise-routes=192.168.1.0/24 --accept-routes --reset</code></li>
-  <li>Restart firewall: <code>/etc/init.d/firewall restart</code></li>
+<li>Go to <a href="https://login.tailscale.com/admin/machines">https://login.tailscale.com/admin/machines</a></li>
+<li>Find the main Brume and <strong>approve the subnet route</strong> (192.168.1.0/24)</li>
+<li><strong>Rename the device</strong> - click the three-dot menu → "Edit machine name" → name it something like "gl-mt2500-main" or "gl-mt2500-pbx-site" to identify it easily</li>
 </ol>
 
-<h3>Approve Route, Name, and Verify</h3>
+<div class="note"><strong>Key difference from remote Brumes:</strong> The main Brume's PBX is on its WAN side (e.g., 192.168.1.0/24), not LAN side. This means the firewall rules use <code>eth0</code> instead of <code>br-lan</code>.</div>
 
-<ol start="19">
-  <li>Go to <a href="https://login.tailscale.com/admin/machines">Tailscale admin console</a></li>
-  <li>Find the main Brume and <strong>approve the subnet route</strong> (192.168.1.0/24)</li>
-  <li><strong>Rename the device</strong> - click the three-dot menu → "Edit machine name" → name it something like "gl-mt2500-main" or "gl-mt2500-pbx-site" to identify it easily</li>
-  <li><strong>Export a backup</strong> - In the Brume web UI, go to <strong>System → Backup / Restore → Export Configuration</strong>. Save the <code>.tar.gz</code> file (e.g., <code>gl-mt2500-main-2024-01-15.tar.gz</code>)</li>
-</ol>
+<a name="step2"></a>
+<h2>Step 2: Main Site Firewall Configuration</h2>
 
-<blockquote><strong>Key difference from remote Brumes:</strong> The main Brume's PBX is on its WAN side (e.g., 192.168.1.0/24), not LAN side. This means the firewall rules use <code>eth0</code> instead of <code>br-lan</code>. See the "Main Site Brume Setup" section at the end of this guide for the specific <code>/etc/rc.local</code> and <code>/etc/firewall.user</code> contents.</blockquote>
+<p>SSH to the main Brume to configure the firewall rules. These are specific to the <strong>main site</strong> because the PBX is on the WAN side.</p>
 
-<hr>
+<div class="code-box"><code>ssh root@192.168.8.1</code></div>
 
-<h2>Step 1B: Remote Site Brume 2 and ATA Setup</h2>
+<p>(Password is the same as the web UI admin password you created)</p>
 
-<p>Each remote site needs its own Brume 2 in <strong>router mode</strong> (the default) with a unique subnet.</p>
-
-<blockquote><strong>IMPORTANT: Configure before deployment!</strong> Set up and join each remote Brume to your Tailnet <strong>before</strong> shipping it to the remote location. This allows you to SSH into the remote Brume 2 via Tailscale (computer or smartphone clients) for any troubleshooting or configuration changes after deployment.</blockquote>
-
-<h3>Pre-deployment Setup (do this at your location)</h3>
-
-<p>To avoid IP conflicts, configure each remote Brume while:</p>
-<ul>
-  <li>The main Brume is <strong>powered off</strong>, OR</li>
-  <li>On a <strong>different network</strong> from the main Brume (since both default to 192.168.8.1)</li>
-</ul>
-
-<ol>
-  <li>Connect Brume 2 <strong>WAN port</strong> to your router (needs internet for Tailscale auth)</li>
-  <li>Access Brume web UI (default: <code>http://192.168.8.1</code>)</li>
-  <li>Set admin password</li>
-  <li>Go to <strong>Network → LAN</strong></li>
-  <li>Change the <strong>LAN IP</strong> to use a unique subnet:
-    <ul>
-      <li>Change the third octet (the "8" in 192.168.<strong>8</strong>.1) to a unique number</li>
-      <li>Example: change <code>192.168.8.1</code> to <code>192.168.10.1</code> for the first remote site</li>
-      <li>Use sequential numbers: 192.168.9.1, 192.168.10.1, 192.168.11.1, etc.</li>
-      <li>The subnet mask stays <code>255.255.255.0</code></li>
-      <li>Click <strong>Apply</strong> - you'll be disconnected briefly as the IP changes</li>
-    </ul>
-  </li>
-  <li>Reconnect to the Brume at its new IP (e.g., <code>http://192.168.10.1</code>)</li>
-  <li>Note this new LAN IP - it becomes the ATA's gateway</li>
-</ol>
-
-<h4>Enable Tailscale</h4>
-
-<ol start="8">
-  <li>In Brume web UI: <strong>VPN → Tailscale</strong></li>
-  <li>Click <strong>Enable Tailscale</strong></li>
-  <li>Click the authentication link and log into your Tailscale account</li>
-  <li>Enable <strong>"Allow Remote Access LAN"</strong></li>
-  <li>Enable <strong>"Allow Remote Access WAN"</strong></li>
-  <li>Note the Tailscale IP assigned (100.x.x.x) - visible in Tailscale admin console</li>
-</ol>
-
-<h4>Configure via SSH</h4>
-
-<ol start="14">
-  <li>SSH to the Brume: <code>ssh root@192.168.X.1</code> using the new LAN IP (password is same as web UI)</li>
-  <li>Create the UCI firewall zone (see Reference A below)</li>
-  <li>Configure <code>/etc/rc.local</code> for remote site (see Reference B - use the <strong>Remote Site version</strong>)</li>
-  <li>Configure <code>/etc/firewall.user</code> for remote site (see Reference C - use the <strong>Remote Site version</strong>)</li>
-  <li>Apply settings: <code>tailscale up --advertise-routes=192.168.X.0/24 --accept-routes --reset</code> (use your subnet)</li>
-  <li>Restart firewall: <code>/etc/init.d/firewall restart</code></li>
-</ol>
-
-<h4>Approve, name, verify, and backup</h4>
-
-<ol start="20">
-  <li>Go to <a href="https://login.tailscale.com/admin/machines">Tailscale admin console</a></li>
-  <li>Find the new Brume and <strong>approve the subnet route</strong></li>
-  <li><strong>Rename the device</strong> - use the name or initials of the friend/family member where it will be deployed (e.g., "gl-mt2500-uncle-bob", "gl-mt2500-mom-dad", "gl-mt2500-j")</li>
-  <li><strong>Verify Tailscale connectivity</strong> - SSH into the Brume using its Tailscale IP (<code>ssh root@100.x.x.x</code>, same password you set for web admin) WHILE your computer's Tailscale client is on AND logged in (login required for each session) and run <code>tailscale ping &lt;PBX-IP&gt;</code>. You should get "pong" back from the main Brume. Get the Brume 2's Tailnet IP address from the Tailscale.com admin.</li>
-  <li><strong>Export a backup</strong> - In the Brume web UI: <strong>System → Backup / Restore → Export Configuration</strong>. Save the <code>.tar.gz</code> file (e.g., <code>gl-mt2500-uncle-bob-2024-01-15.tar.gz</code>)</li>
-</ol>
-
-<h3>Deployment at Remote Site</h3>
-
-<p>Once pre-configured, deployment is simple:</p>
-
-<ol>
-  <li>Ship or carry the Brume to the remote location</li>
-  <li>Connect Brume <strong>WAN port</strong> to the remote site's router (gets internet via DHCP)</li>
-  <li>Connect Brume <strong>LAN port</strong> to ATA (or a switch with ATA connected)</li>
-  <li>Connect an analog phone to the ATA</li>
-  <li>Power on - the Brume will automatically connect to Tailscale</li>
-  <li>Configure the ATA (Step 4) and verify registration (Step 5)</li>
-</ol>
-
-<p>If anything goes wrong, you can SSH to the Brume via its Tailscale IP from the computer that you installed the Tailscale client app. Make sure Tailscale is turned on, and you also have to log in for each session.</p>
-
-<h3>Choosing a Subnet</h3>
-
-<p>Use a unique /24 subnet for each site. Use sequential numbers starting above 8 (since 192.168.8.x is the Brume default):</p>
-
-<table>
-  <thead>
-    <tr>
-      <th>Site</th>
-      <th>Subnet</th>
-      <th>Brume LAN IP</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Main (PBX)</td>
-      <td>192.168.1.0/24</td>
-      <td>(WAN side, no change needed)</td>
-    </tr>
-    <tr>
-      <td>Remote Site 1</td>
-      <td>192.168.9.0/24</td>
-      <td>192.168.9.1</td>
-    </tr>
-    <tr>
-      <td>Remote Site 2</td>
-      <td>192.168.10.0/24</td>
-      <td>192.168.10.1</td>
-    </tr>
-    <tr>
-      <td>Remote Site 3</td>
-      <td>192.168.11.0/24</td>
-      <td>192.168.11.1</td>
-    </tr>
-    <tr>
-      <td>Remote Site 4</td>
-      <td>192.168.12.0/24</td>
-      <td>192.168.12.1</td>
-    </tr>
-  </tbody>
-</table>
-
-<blockquote><strong>Why start above 8?</strong> The Brume defaults to 192.168.8.x. Using 9, 10, 11... makes it easy to remember which site is which and avoids conflicts with the default. Also avoid 192.168.0.x and 192.168.1.x as these are common home network subnets that may conflict at remote sites.</blockquote>
-
-<hr>
-
-<h2>Step 1C: Wireless Option with Beryl AX</h2>
-
-<p>If you don't want to place the phone right next to the router or need to avoid running ethernet or phone cables to where you want the phone, you can use a wireless subnet router instead: the <a href="https://www.gl-inet.com/products/gl-mt3000/">GL.iNet Beryl AX (GL-MT3000)</a>.</p>
-
-<p>The Beryl AX connects wirelessly to the remote site's existing WiFi router, then provides a wired ethernet port for the ATA. This lets you place the phone anywhere with a power outlet and WiFi coverage.</p>
-
-<h3>Setting Up Beryl AX in Repeater Mode</h3>
-
-<ol>
-  <li>Power on the Beryl AX and connect your computer to it via ethernet or its default WiFi network (check the label on the device for the default SSID and password)</li>
-  <li>Access the web UI at <code>http://192.168.8.1</code></li>
-  <li>Complete initial setup (set admin password, timezone, etc.)</li>
-  <li>Go to <strong>Network → LAN</strong> and change the LAN IP to a unique subnet (e.g., 192.168.10.1) just like with the Brume 2 - this avoids conflicts</li>
-  <li>Click <strong>Apply</strong> and reconnect to the new IP (e.g., <code>http://192.168.10.1</code>)</li>
-  <li>Go to <strong>Internet → Repeater</strong></li>
-  <li>If you have a spare router give that router the same name and password as the one it will be connected to at your friend's or family member's home and then set up the Beryl AX to log into it, so once it is on site, it will connect directly. Confirm, if you can, if your friend or family member's existing router is 5gHz or 2.5gHz.</li>
-  <li>Click <strong>Scan</strong> to find available WiFi networks</li>
-  <li>Select the remote site's WiFi network and enter the password</li>
-  <li>Click <strong>Join</strong> - the Beryl will connect wirelessly to the wireless network once it is on site. For setup, just use Ethernet.</li>
-  <li>Reconnect and verify the connection shows as active in the Repeater section</li>
-</ol>
-
-<h3>Configure Tailscale and Firewall</h3>
-
-<p>Once connected to WiFi, configure Tailscale the same way as the Brume 2:</p>
-
-<ol start="11">
-  <li>Go to <strong>VPN → Tailscale</strong> and enable it</li>
-  <li>Authenticate with your Tailscale account</li>
-  <li>Enable <strong>"Allow Remote Access LAN"</strong> and <strong>"Allow Remote Access WAN"</strong></li>
-  <li>SSH to the Beryl: <code>ssh root@192.168.X.1</code></li>
-  <li>Configure the UCI firewall zone (Reference A)</li>
-  <li>Configure <code>/etc/rc.local</code> (Reference B - Remote Site version)</li>
-  <li>Configure <code>/etc/firewall.user</code> (Reference C - Remote Site version)</li>
-  <li>Run: <code>tailscale up --advertise-routes=192.168.X.0/24 --accept-routes --reset</code></li>
-  <li>Restart firewall: <code>/etc/init.d/firewall restart</code></li>
-  <li>Approve the subnet route in Tailscale admin and rename the device</li>
-  <li>Export a backup</li>
-</ol>
-
-<h3>Deployment</h3>
-
-<ol>
-  <li>Ship the pre-configured Beryl AX to the remote location</li>
-  <li>Power it on anywhere with WiFi coverage - it will automatically connect to the WiFi network you configured</li>
-  <li>Connect the ATA to the Beryl's LAN port via ethernet</li>
-  <li>Connect an analog phone to the ATA</li>
-  <li>The Beryl connects to WiFi → Tailscale → PBX automatically</li>
-</ol>
-
-<blockquote><strong>Note:</strong> The Beryl AX remembers the WiFi network credentials. If the remote site's WiFi password changes, you'll need to SSH in via Tailscale and update the Repeater settings, or have someone on-site temporarily connect to the Beryl's LAN to access the web UI.</blockquote>
-
-<hr>
-
-<h2>Reference Sections</h2>
-
-<p>The following sections contain the detailed commands referenced by Steps 1A, 1B, and 1C above.</p>
-
-<hr>
-
-<h3>Reference A: UCI Firewall Zone</h3>
-
-<p>SSH to the Brume (via Tailscale IP or LAN):</p>
-
-<pre><code>ssh root@&lt;tailscale-ip&gt;</code></pre>
+<h3>2a. Create UCI Firewall Zone</h3>
 
 <p>Run these commands to create a Tailscale firewall zone:</p>
 
-<pre><code># Create Tailscale zone
+<div class="code-box"><code># Create Tailscale zone
 uci add firewall zone
 uci set firewall.@zone[-1].name='ts'
 uci set firewall.@zone[-1].input='ACCEPT'
@@ -275,36 +171,329 @@ uci set firewall.@zone[-1].output='ACCEPT'
 uci set firewall.@zone[-1].forward='ACCEPT'
 uci set firewall.@zone[-1].device='tailscale0'
 
-# Add forwarding ts -&gt; lan
+# Add forwarding ts -> lan
 uci add firewall forwarding
 uci set firewall.@forwarding[-1].src='ts'
 uci set firewall.@forwarding[-1].dest='lan'
 
-# Add forwarding lan -&gt; ts
+# Add forwarding lan -> ts
 uci add firewall forwarding
 uci set firewall.@forwarding[-1].src='lan'
 uci set firewall.@forwarding[-1].dest='ts'
 
 # Save changes
-uci commit firewall</code></pre>
+uci commit firewall</code></div>
 
 <p>Verify:</p>
 
-<pre><code>uci show firewall | grep -E "zone.*ts|forwarding"</code></pre>
+<div class="code-box"><code>uci show firewall | grep -E "zone.*ts|forwarding"</code></div>
 
-<p>Should show <code>zone[*].name='ts'</code> and forwarding rules for ts↔lan.</p>
+<p>The output should match the content you entered above.</p>
 
-<hr>
-
-<h3>Reference B: Configure /etc/rc.local</h3>
+<h3>2b. Configure /etc/rc.local (Main Site)</h3>
 
 <p>This ensures Tailscale settings persist after reboot.</p>
 
-<blockquote><strong>IMPORTANT</strong>: When typing these commands, the closing <code>ENDFILE</code> must have <strong>no spaces before it</strong>. If your terminal adds leading spaces when you paste, use the arrow keys and backspace to remove them before pressing Enter.</blockquote>
+<div class="important"><strong>IMPORTANT:</strong> When typing these commands, the closing <code>ENDFILE</code> must have <strong>no spaces before it</strong>. If your terminal adds leading spaces when you paste, use the arrow keys and backspace to remove them before pressing Enter.</div>
 
-<p>Replace <code>192.168.X.0/24</code> with your actual subnet and <code>192.168.1.100</code> with your PBX IP:</p>
+<div class="code-box"><code>cat > /etc/rc.local << 'ENDFILE'
+# Put your custom commands here that should be executed once
+# the system init finished. By default this file does nothing.
 
-<pre><code>cat &gt; /etc/rc.local &lt;&lt; 'ENDFILE'
+. /lib/functions/gl_util.sh
+remount_ubifs
+
+# Wait for Tailscale to be ready
+sleep 10
+
+# Apply Tailscale settings - advertise the PBX subnet
+tailscale up --advertise-routes=192.168.1.0/24 --accept-routes --reset
+
+exit 0
+ENDFILE</code></div>
+
+<p>Verify:</p>
+
+<div class="code-box"><code>cat /etc/rc.local</code></div>
+
+<p>The output should match the content you entered above.</p>
+
+<h3>2c. Configure /etc/firewall.user (Main Site)</h3>
+
+<p>The main site uses <code>eth0</code> (WAN interface) because the PBX is on the WAN side.</p>
+
+<div class="important"><strong>IMPORTANT:</strong> Same as above - the closing <code>ENDFILE</code> must have <strong>no leading spaces</strong>.</div>
+
+<div class="code-box"><code>cat >> /etc/firewall.user << 'ENDFILE'
+
+# MASQUERADE traffic from WAN subnet to Tailscale
+iptables -t nat -I POSTROUTING -o tailscale0 -s 192.168.1.0/24 -j MASQUERADE
+
+# FORWARD rules for eth0 <-> tailscale0 (WAN to Tailscale)
+iptables -I FORWARD -i tailscale0 -o eth0 -j ACCEPT
+iptables -I FORWARD -i eth0 -o tailscale0 -j ACCEPT
+
+# Restart Tailscale to restore its rules
+/etc/init.d/tailscale restart
+ENDFILE</code></div>
+
+<p>Verify:</p>
+
+<div class="code-box"><code>cat /etc/firewall.user</code></div>
+
+<p>The output should match the content you entered above.</p>
+
+<h3>2d. Apply Settings</h3>
+
+<div class="code-box"><code>tailscale up --advertise-routes=192.168.1.0/24 --accept-routes --reset
+/etc/init.d/firewall restart</code></div>
+
+<a name="step3"></a>
+<h2>Step 3: Reserve PBX IP Address</h2>
+
+<p>Log into your main site router and create a DHCP reservation for the PBX (Raspberry Pi). This prevents the router from assigning a different IP address to the PBX after a power outage or reboot, which would require updating all ATA configurations.</p>
+
+<p>Look for DHCP reservation, static lease, or address reservation in your router's settings. You'll need the PBX's MAC address and its current IP (192.168.1.100 or whatever you've been using).</p>
+
+<a name="step4"></a>
+<h2>Step 4: Create Extensions in FreePBX</h2>
+
+<p>Create SIP extensions for <strong>all</strong> phones in your system - both the main site ATA and all remote ATAs. Do this now while you're at the main site.</p>
+
+<ol>
+<li>Log into FreePBX web interface on your local network (check your router for the PBX IP). The default username is admin, password is admin.</li>
+<li>Go to <strong>Applications → Extensions</strong></li>
+<li>Click <strong>Add Extension</strong> → <strong>Add New PJSIP Extension</strong> (or SIP if using chan_sip)</li>
+<li>Enter:
+    <ul>
+    <li><strong>User Extension</strong>: Extension number (e.g., 100 for main site, 101-109 for remote sites)</li>
+    <li><strong>Display Name</strong>: Description (e.g., "Main House", "Mom and Dad", "Uncle Bob")</li>
+    <li><strong>Secret</strong>: Copy the auto-generated password or set your own</li>
+    </ul></li>
+<li>Click <strong>Submit</strong></li>
+<li>Click the <strong>red "Apply Config" button</strong> at the top</li>
+<li>Copy the <strong>Secret</strong> (password) - you'll need it for the ATA</li>
+<li>Repeat steps 2 through 7 for each phone in your system (main site + all remote sites)</li>
+</ol>
+
+<div class="note"><strong>Tip:</strong> Create all extensions now so you have the passwords ready when configuring each ATA.</div>
+
+<a name="step5"></a>
+<h2>Step 5: Configure Main Site ATA</h2>
+
+<p>The main site ATA connects directly to your router (same network as the PBX), so configuration is simpler than remote ATAs.</p>
+
+<p>Access the ATA's web interface and configure:</p>
+
+<h3>Network Settings</h3>
+
+<table>
+<tr><th>Setting</th><th>Value</th></tr>
+<tr><td>Connection Type</td><td><strong>DHCP</strong> or <strong>Static IP</strong></td></tr>
+<tr><td>IP Address</td><td>(If static: 192.168.1.101 or similar)</td></tr>
+<tr><td>Subnet Mask</td><td>255.255.255.0</td></tr>
+<tr><td>Default Gateway</td><td>Your router's IP (e.g., 192.168.1.1)</td></tr>
+<tr><td>Primary DNS</td><td>8.8.8.8 or your router's IP</td></tr>
+</table>
+
+<h3>SIP/Line Settings</h3>
+
+<table>
+<tr><th>Setting</th><th>Value</th></tr>
+<tr><td>SIP Proxy</td><td>192.168.1.100 (PBX IP)</td></tr>
+<tr><td>SIP Port</td><td>5060</td></tr>
+<tr><td>Register</td><td>Yes</td></tr>
+<tr><td>User ID</td><td>Extension number (e.g., 100)</td></tr>
+<tr><td>Auth ID</td><td>Same as User ID</td></tr>
+<tr><td>Password</td><td>SIP secret from FreePBX</td></tr>
+</table>
+
+<p>If you will use both lines on a 2 line ATA the 2nd line should use SIP port 5061, and it might set this automatically, but verify it.</p>
+
+<p><strong>Click "Submit All Changes"</strong> to save and trigger registration.</p>
+
+<a name="step6"></a>
+<h2>Step 6: Verify Main Site SIP Registration</h2>
+
+<h3>Check the ATA</h3>
+
+<ol>
+<li>Access the ATA's web admin (e.g., http://192.168.1.101)</li>
+<li>Look for registration status - usually on the main status page or under Line/SIP settings</li>
+<li>Should show <strong>"Registered"</strong> or <strong>"Online"</strong></li>
+</ol>
+
+<h3>Verify on the PBX</h3>
+
+<p>SSH into the PBX (Raspberry Pi). The username: root, password: raspberry.</p>
+
+<div class="code-box"><code>ssh root@192.168.1.100</code></div>
+
+<p>Check registration:</p>
+
+<div class="code-box"><code>asterisk -rx "pjsip show endpoints" | grep 100
+# or for chan_sip:
+asterisk -rx "sip show peers" | grep 100</code></div>
+
+<p>Should show the extension with status "OK" or "Avail".</p>
+
+<h3>Test Dial Tone</h3>
+
+<p>Pick up the phone connected to the main site ATA. You should hear a dial tone, confirming the ATA is registered with the PBX.</p>
+
+<a name="step7"></a>
+<h2>Step 7: Configure and Test Remote ATA Locally</h2>
+
+<p>Before setting up the remote Brume 2, test the remote ATA locally on your main network. This confirms the extension works before adding the complexity of the Tailscale tunnel.</p>
+
+<h3>Temporary Local Setup</h3>
+
+<p>Connect the remote ATA directly to your main router (the same network as the PBX), <strong>not</strong> to the Brume 2 yet. Leave the ATA's network settings on <strong>DHCP/Dynamic</strong> - no network configuration is needed for this test.</p>
+
+<h3>SIP/Line Settings</h3>
+
+<table>
+<tr><th>Setting</th><th>Value</th></tr>
+<tr><td>SIP Proxy</td><td>192.168.1.100 (PBX IP)</td></tr>
+<tr><td>SIP Port</td><td>5060</td></tr>
+<tr><td>Register</td><td>Yes</td></tr>
+<tr><td>User ID</td><td>Extension number (e.g., 101)</td></tr>
+<tr><td>Auth ID</td><td>Same as User ID</td></tr>
+<tr><td>Password</td><td>SIP secret from FreePBX (created in <a href="#step4">Step 4</a>)</td></tr>
+</table>
+
+<p><strong>Click "Submit All Changes"</strong> to save and trigger registration.</p>
+
+<h3>Test Local Call</h3>
+
+<ol>
+<li>Verify the ATA shows <strong>"Registered"</strong> in its web interface</li>
+<li>Pick up the phone connected to this ATA - you should hear dial tone</li>
+<li>Dial the main site extension (e.g., 100)</li>
+<li>The main site phone should ring - answer and verify two-way audio works</li>
+<li>Hang up, then test the other direction: pick up the main site phone and dial this extension (e.g., 101)</li>
+<li>Answer and verify two-way audio works in both directions</li>
+</ol>
+
+<p>Once calls succeed in both directions, you've confirmed the extension is configured correctly. You'll reconfigure this ATA for the remote subnet after setting up the remote Brume 2.</p>
+
+<h2>Remote Site Setup</h2>
+
+<p>Repeat these steps for each remote location. Complete the main site setup first!</p>
+
+<a name="step8"></a>
+<h2>Step 8: Remote Site Brume 2 Setup</h2>
+
+<p>Each remote site needs its own Brume 2 in <strong>router mode</strong> (the default) with a unique subnet.</p>
+
+<div class="important"><strong>IMPORTANT: Configure before deployment!</strong> Set up and join each remote Brume to your Tailnet <strong>before</strong> shipping or bringing it to the remote location. This allows you to SSH into the remote Brume 2 via Tailscale for troubleshooting after deployment.</div>
+
+<h3>Pre-deployment Setup (do this at your location)</h3>
+
+<p>To avoid IP conflicts, configure each remote Brume while:</p>
+<ul>
+<li>The main Brume is <strong>powered off</strong>, OR</li>
+<li>On a <strong>different network</strong> from the main Brume (since both default to 192.168.8.1)</li>
+</ul>
+
+<ol>
+<li>Connect Brume 2 <strong>WAN port</strong> to your router (needs internet for Tailscale auth)</li>
+<li>Access Brume web UI (default: http://192.168.8.1)</li>
+<li>Set admin password</li>
+<li>Go to <strong>Network → LAN</strong></li>
+<li>Change the <strong>LAN IP</strong> to use a unique subnet:
+    <ul>
+    <li>Change the third octet (the "8" in 192.168.<strong>8</strong>.1) to a unique number</li>
+    <li>Example: change <code>192.168.8.1</code> to <code>192.168.10.1</code> for the first remote site</li>
+    <li>Use sequential numbers: 192.168.9.1, 192.168.10.1, 192.168.11.1, etc.</li>
+    <li>The subnet mask stays <code>255.255.255.0</code></li>
+    <li>Click <strong>Apply</strong> - you'll be disconnected briefly as the IP changes</li>
+    </ul></li>
+<li>Reconnect to the Brume at its new IP (e.g., http://192.168.10.1)</li>
+<li>Note this new LAN IP - it becomes the ATA's gateway</li>
+</ol>
+
+<h3>Enable Tailscale</h3>
+
+<ol start="8">
+<li>In Brume web UI: <strong>Applications → Tailscale</strong></li>
+<li>Click <strong>Enable Tailscale</strong></li>
+<li>Click the authentication link and log into your Tailscale account</li>
+<li>Enable <strong>"Allow Remote Access LAN"</strong></li>
+<li>Enable <strong>"Allow Remote Access WAN"</strong></li>
+<li>Note the Tailscale IP assigned (100.x.x.x) - visible in Tailscale admin console</li>
+</ol>
+
+<h3>Approve Route and Name Device</h3>
+
+<ol start="14">
+<li>Go to <a href="https://login.tailscale.com/admin/machines">https://login.tailscale.com/admin/machines</a></li>
+<li>Find the new Brume and <strong>approve the subnet route</strong></li>
+<li><strong>Rename the device</strong> - use the name or initials of the friend/family member where it will be deployed (e.g., "gl-mt2500-uncle-bob", "gl-mt2500-mom-dad")</li>
+</ol>
+
+<h3>Choosing a Subnet</h3>
+
+<p>Use a unique /24 subnet for each site:</p>
+
+<table>
+<tr><th>Site</th><th>Subnet</th><th>Brume LAN IP</th></tr>
+<tr><td>Main (PBX)</td><td>192.168.1.0/24</td><td>(WAN side, no change needed)</td></tr>
+<tr><td>Remote Site 1</td><td>192.168.9.0/24</td><td>192.168.9.1</td></tr>
+<tr><td>Remote Site 2</td><td>192.168.10.0/24</td><td>192.168.10.1</td></tr>
+<tr><td>Remote Site 3</td><td>192.168.11.0/24</td><td>192.168.11.1</td></tr>
+<tr><td>Remote Site 4</td><td>192.168.12.0/24</td><td>192.168.12.1</td></tr>
+</table>
+
+<div class="note"><strong>Why start above 8?</strong> The Brume defaults to 192.168.8.x. Using 9, 10, 11... makes it easy to remember which site is which and avoids conflicts with the default. Also avoid 192.168.0.x and 192.168.1.x as these are common home network subnets that may conflict at remote sites.</div>
+
+<a name="step9"></a>
+<h2>Step 9: Remote Site Firewall Configuration</h2>
+
+<p>SSH to the remote Brume to configure the firewall rules. These are specific to <strong>remote sites</strong> because the ATA is on the LAN side.</p>
+
+<div class="code-box"><code>ssh root@192.168.X.1</code></div>
+
+<p>(Replace X with your subnet number, e.g., 192.168.10.1. Password is the same as the web UI admin password you created)</p>
+
+<h3>9a. Create UCI Firewall Zone</h3>
+
+<p>Run these commands to create a Tailscale firewall zone (same as main site):</p>
+
+<div class="code-box"><code># Create Tailscale zone
+uci add firewall zone
+uci set firewall.@zone[-1].name='ts'
+uci set firewall.@zone[-1].input='ACCEPT'
+uci set firewall.@zone[-1].output='ACCEPT'
+uci set firewall.@zone[-1].forward='ACCEPT'
+uci set firewall.@zone[-1].device='tailscale0'
+
+# Add forwarding ts -> lan
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='ts'
+uci set firewall.@forwarding[-1].dest='lan'
+
+# Add forwarding lan -> ts
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='lan'
+uci set firewall.@forwarding[-1].dest='ts'
+
+# Save changes
+uci commit firewall</code></div>
+
+<p>Verify:</p>
+
+<div class="code-box"><code>uci show firewall | grep -E "zone.*ts|forwarding"</code></div>
+
+<p>The output should match the content you entered above.</p>
+
+<h3>9b. Configure /etc/rc.local (Remote Site)</h3>
+
+<p>Copy the code below to a text editor, replace <code>192.168.X.0/24</code> with your actual subnet (e.g., 192.168.10.0/24), then paste into the terminal:</p>
+
+<div class="important"><strong>IMPORTANT:</strong> The closing <code>ENDFILE</code> must have <strong>no spaces before it</strong>.</div>
+
+<div class="code-box"><code>cat > /etc/rc.local << 'ENDFILE'
 # Put your custom commands here that should be executed once
 # the system init finished. By default this file does nothing.
 
@@ -317,29 +506,29 @@ sleep 10
 # Apply Tailscale settings - CHANGE SUBNET BELOW
 tailscale up --advertise-routes=192.168.X.0/24 --accept-routes --reset
 
-# Add explicit route to PBX - CHANGE IP BELOW
-ip route add 192.168.1.100/32 dev tailscale0 2&gt;/dev/null || true
+# Add explicit route to PBX - CHANGE IP BELOW IF DIFFERENT
+ip route add 192.168.1.100/32 dev tailscale0 2>/dev/null || true
 
 exit 0
-ENDFILE</code></pre>
+ENDFILE</code></div>
 
 <p>Verify:</p>
 
-<pre><code>cat /etc/rc.local</code></pre>
+<div class="code-box"><code>cat /etc/rc.local</code></div>
 
-<hr>
+<p>The output should match the content you entered above.</p>
 
-<h3>Reference C: Configure /etc/firewall.user</h3>
+<h3>9c. Configure /etc/firewall.user (Remote Site)</h3>
 
-<p>This adds the MASQUERADE rule required for Tailscale to forward LAN traffic.</p>
+<p>Remote sites use <code>br-lan</code> (LAN interface) because the ATA is on the LAN side.</p>
 
-<blockquote><strong>IMPORTANT</strong>: Same as above - the closing <code>ENDFILE</code> must have <strong>no leading spaces</strong>.</blockquote>
+<p>Copy the code below to a text editor, replace <code>192.168.X.0/24</code> with your actual subnet, then paste into the terminal:</p>
 
-<p>Replace <code>192.168.X.0/24</code> with your actual subnet:</p>
+<div class="important"><strong>IMPORTANT:</strong> The closing <code>ENDFILE</code> must have <strong>no leading spaces</strong>.</div>
 
-<pre><code>cat &gt;&gt; /etc/firewall.user &lt;&lt; 'ENDFILE'
+<div class="code-box"><code>cat >> /etc/firewall.user << 'ENDFILE'
 
-# allow LAN &lt;-&gt; Tailscale
+# allow LAN <-> Tailscale
 iptables -I FORWARD -i tailscale0 -o br-lan -j ACCEPT
 iptables -I FORWARD -i br-lan -o tailscale0 -j ACCEPT
 
@@ -348,281 +537,266 @@ iptables -t nat -I POSTROUTING -o tailscale0 -s 192.168.X.0/24 -j MASQUERADE
 
 # Restart Tailscale to restore its rules
 /etc/init.d/tailscale restart
-ENDFILE</code></pre>
+ENDFILE</code></div>
 
 <p>Verify:</p>
 
-<pre><code>cat /etc/firewall.user</code></pre>
+<div class="code-box"><code>cat /etc/firewall.user</code></div>
 
-<hr>
+<p>The output should match the content you entered above.</p>
 
-<h2>Post-Setup Steps</h2>
+<h3>9d. Apply Settings</h3>
 
-<p>After completing Step 1A (main Brume) and Step 1B (remote Brumes), continue with these steps.</p>
+<div class="code-box"><code>tailscale up --advertise-routes=192.168.X.0/24 --accept-routes --reset
+/etc/init.d/firewall restart</code></div>
 
-<hr>
+<a name="step10"></a>
+<h2>Step 10: Verify Tailscale Routing</h2>
 
-<h3>Step 2: Verify Tailscale Routing</h3>
+<p>On the remote Brume, test connectivity to the PBX:</p>
 
-<p>On the new Brume, test connectivity to the PBX:</p>
-
-<pre><code># Should show route is advertised
+<div class="code-box"><code># Should show route is advertised
 tailscale debug prefs | grep -A3 AdvertiseRoutes
 
-# Should return "pong from &lt;main-brume-name&gt;"
+# Should return "pong from <main-brume-name>"
 tailscale ping 192.168.1.100
 
 # Should succeed with ~20-50ms latency
-ping -c 3 192.168.1.100</code></pre>
+ping -c 3 192.168.1.100</code></div>
 
-<h4>If <code>tailscale ping</code> says "no matching peer":</h4>
-
-<ol>
-  <li>Check that the main site subnet (e.g., 192.168.1.0/24) route is approved for the <strong>main Brume</strong> in Tailscale admin</li>
-  <li>Run <code>tailscale up --accept-routes --reset</code> again on the new Brume</li>
-  <li>Wait 30 seconds and retry</li>
-</ol>
-
-<hr>
-
-<h3>Step 3: Create Extension in FreePBX</h3>
-
-<p>Before configuring the ATA, create the SIP extension in FreePBX:</p>
+<h3>If <code>tailscale ping</code> says "no matching peer":</h3>
 
 <ol>
-  <li>Log into FreePBX web interface on your local network (check your router for the PBX IP)</li>
-  <li>Go to <strong>Applications → Extensions</strong></li>
-  <li>Click <strong>Add Extension</strong> → <strong>Add New PJSIP Extension</strong> (or SIP if using chan_sip)</li>
-  <li>Enter:
-    <ul>
-      <li><strong>User Extension</strong>: Extension number (e.g., 101, 102)</li>
-      <li><strong>Display Name</strong>: Description (e.g., "Remote Office")</li>
-      <li><strong>Secret</strong>: Note the auto-generated password or set your own</li>
-    </ul>
-  </li>
-  <li>Click <strong>Submit</strong></li>
-  <li>Click the <strong>red "Apply Config" button</strong> at the top</li>
-  <li>Copy the <strong>Secret</strong> (password) - you'll need it for the ATA</li>
-  <li>Repeat steps 2 through 7 for each additional remote line</li>
+<li>Check that the main site subnet (e.g., 192.168.1.0/24) route is approved for the <strong>main Brume</strong> in Tailscale admin</li>
+<li>Run <code>tailscale up --accept-routes --reset</code> again on the remote Brume</li>
+<li>Wait 30 seconds and retry</li>
 </ol>
 
-<hr>
+<a name="step11"></a>
+<h2>Step 11: Reconfigure Remote ATA for Deployment</h2>
 
-<h3>Step 4: Configure ATA</h3>
+<p>Connect the ATA you tested in Step 7 to the remote Brume's LAN port.</p>
 
-<p>Access the ATA's web interface and configure:</p>
+<h3>Network Settings</h3>
 
-<h4>Network Settings</h4>
+<p>No changes needed - leave the ATA on <strong>DHCP</strong>. The Brume will assign it an IP address in the correct subnet automatically.</p>
 
-<table>
-  <thead>
-    <tr>
-      <th>Setting</th>
-      <th>Value</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Connection Type</td>
-      <td><strong>Static IP</strong></td>
-    </tr>
-    <tr>
-      <td>IP Address</td>
-      <td>192.168.X.100 (example)</td>
-    </tr>
-    <tr>
-      <td>Subnet Mask</td>
-      <td>255.255.255.0</td>
-    </tr>
-    <tr>
-      <td>Default Gateway</td>
-      <td>192.168.X.1 (Brume LAN IP)</td>
-    </tr>
-    <tr>
-      <td>Primary DNS</td>
-      <td>8.8.8.8 or Brume LAN IP</td>
-    </tr>
-  </tbody>
-</table>
+<p>To find the ATA's IP address, log into the Brume 2 web admin and check the <strong>Clients</strong> list.</p>
 
-<h4>SIP/Line Settings</h4>
+<h3>SIP/Line Settings</h3>
 
-<table>
-  <thead>
-    <tr>
-      <th>Setting</th>
-      <th>Value</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>SIP Proxy</td>
-      <td>192.168.1.100 (PBX IP)</td>
-    </tr>
-    <tr>
-      <td>SIP Port</td>
-      <td>5060</td>
-    </tr>
-    <tr>
-      <td>Register</td>
-      <td>Yes</td>
-    </tr>
-    <tr>
-      <td>User ID</td>
-      <td>Extension number (e.g., 101)</td>
-    </tr>
-    <tr>
-      <td>Auth ID</td>
-      <td>Same as User ID</td>
-    </tr>
-    <tr>
-      <td>Password</td>
-      <td>SIP secret from FreePBX</td>
-    </tr>
-  </tbody>
-</table>
+<p>No changes needed - the SIP settings from Step 7 remain the same. The ATA will reach the PBX at 192.168.1.100 through the Tailscale tunnel.</p>
 
-<p>If you will use both lines on a 2 line ATA the 2nd line should use SIP port 5061</p>
+<a name="step12"></a>
+<h2>Step 12: Verify Remote SIP Registration</h2>
 
-<p><strong>Click "Submit All Changes"</strong> to save and trigger registration.</p>
-
-<hr>
-
-<h3>Step 5: Verify SIP Registration</h3>
-
-<h4>Check the ATA first</h4>
-
-<p>Before expecting a dial tone, verify registration in the ATA's web interface:</p>
+<h3>Check the ATA</h3>
 
 <ol>
-  <li>Access the ATA's web admin (e.g., <code>http://192.168.10.100</code>)</li>
-  <li>Look for registration status - usually on the main status page or under Line/SIP settings</li>
-  <li>Should show <strong>"Registered"</strong> or <strong>"Online"</strong></li>
-  <li>If it shows "Registering...", "Failed", or "Offline", there's a connectivity issue - check the Brume's Tailscale connection first</li>
+<li>Access the ATA's web admin (e.g., http://192.168.10.100). If you are unsure of the ATA's IP you can see it under Clients in the Brume 2/Beryl AX web admin.</li>
+<li>Look for registration status - usually on the main status page or under Line/SIP settings</li>
+<li>Should show <strong>"Registered"</strong> or <strong>"Online"</strong></li>
+<li>If it shows "Registering...", "Failed", or "Offline", there's a connectivity issue - check the Brume's Tailscale connection first (<a href="#step10">Step 10</a>)</li>
 </ol>
 
-<h4>Verify on the PBX</h4>
+<h3>Verify on the PBX</h3>
 
-<p>Once the ATA shows registered, confirm on the PBX (Raspberry Pi):</p>
+<p>SSH into the PBX and check registration:</p>
 
-<pre><code>asterisk -rx "pjsip show endpoints" | grep &lt;extension&gt;
+<div class="code-box"><code>asterisk -rx "pjsip show endpoints" | grep 101
 # or for chan_sip:
-asterisk -rx "sip show peers" | grep &lt;extension&gt;</code></pre>
+asterisk -rx "sip show peers" | grep 101</code></div>
 
-<p>Replace <code>&lt;extension&gt;</code> with just the number, like: <code>asterisk -rx "sip show peers" | grep 101</code></p>
-
-<p>Should show the extension with status "OK" or "Avail".</p>
+<p>Replace 101 with your extension number. Should show status "OK" or "Avail".</p>
 
 <p>If not registered, wait 1-2 minutes or reboot the ATA.</p>
 
-<hr>
+<a name="step13"></a>
+<h2>Step 13: Test Remote Setup Through Tunnel</h2>
 
-<h3>Step 6: Reboot Test</h3>
+<p>Before shipping the remote Brume and ATA, test everything locally to confirm it works through the Tailscale tunnel.</p>
+
+<h3>Make a Test Call</h3>
+
+<ol>
+<li>With the remote Brume connected to your local network (WAN port to your router)</li>
+<li>ATA connected to the remote Brume's LAN port</li>
+<li>Phone connected to the ATA</li>
+<li>Pick up the phone - you should hear dial tone</li>
+<li>Dial the main site extension (e.g., 100)</li>
+<li>The main site phone should ring</li>
+<li>Answer and verify two-way audio works</li>
+</ol>
+
+<h3>Troubleshooting</h3>
+
+<p>If no dial tone:</p>
+<ul>
+<li>Check ATA registration in the ATA's web interface</li>
+<li>Verify Tailscale routing (<a href="#step10">Step 10</a>)</li>
+<li>Check firewall configuration (<a href="#step9">Step 9</a>)</li>
+</ul>
+
+<p>If dial tone but call doesn't connect:</p>
+<ul>
+<li>Verify extension numbers match FreePBX configuration</li>
+<li>Check FreePBX logs for errors</li>
+</ul>
+
+<p>Once the test call succeeds, the remote setup is ready for deployment.</p>
+
+<a name="step14"></a>
+<h2>Step 14: Deploy to Remote Site</h2>
+
+<p>Once pre-configured and tested locally, deployment is simple:</p>
+
+<ol>
+<li>Ship or carry the Brume 2, ATA, phone, and all the cables to the remote location</li>
+<li>Connect Brume <strong>WAN port</strong> to the remote site's router (gets internet via DHCP)</li>
+<li>Connect Brume <strong>LAN port</strong> to ATA (or a switch with ATA connected)</li>
+<li>Connect an analog phone to the ATA</li>
+<li>Power on - the Brume will automatically connect to Tailscale</li>
+<li>Test by calling between the remote phone and main site phone</li>
+</ol>
+
+<p>If anything goes wrong, you can SSH to the Brume via its Tailscale IP from your computer (with Tailscale client running and logged in).</p>
+
+<h2>Final Steps</h2>
+
+<a name="step15"></a>
+<h2>Step 15: Reboot Test</h2>
 
 <p>Verify everything survives a power cycle:</p>
 
 <ol>
-  <li><strong>Power off</strong> the Brume (unplug power)</li>
-  <li>Wait 30 seconds</li>
-  <li><strong>Power on</strong></li>
-  <li>Wait 3-5 minutes for full boot and Tailscale connection</li>
-  <li>Check ATA registration on PBX:</li>
+<li><strong>Power off</strong> the Brume (unplug power)</li>
+<li>Wait 30 seconds</li>
+<li><strong>Power on</strong></li>
+<li>Wait 3-5 minutes for full boot and Tailscale connection</li>
+<li>Check ATA registration on PBX:
+<div class="code-box"><code>asterisk -rx "pjsip show endpoints" | grep &lt;extension&gt;</code></div></li>
 </ol>
-
-<pre><code>asterisk -rx "pjsip show endpoints" | grep &lt;extension&gt;</code></pre>
 
 <p>If registration fails after reboot, check:</p>
 <ul>
-  <li><code>/etc/rc.local</code> has the tailscale up command</li>
-  <li><code>/etc/firewall.user</code> has the MASQUERADE rule</li>
-  <li>Subnet route is still approved in Tailscale admin</li>
+<li><code>/etc/rc.local</code> has the tailscale up command</li>
+<li><code>/etc/firewall.user</code> has the MASQUERADE rule</li>
+<li>Subnet route is still approved in Tailscale admin</li>
 </ul>
 
-<hr>
-
-<h3>Step 7: Make a Test Call</h3>
+<a name="step16"></a>
+<h2>Step 16: Make a Test Call</h2>
 
 <p>The ultimate test - pick up the phone and make a call!</p>
 
 <ol>
-  <li>Pick up the analog phone connected to the ATA</li>
-  <li>Listen for dial tone (confirms ATA is working and registered. If there is no dial tone it is not registered with the PBX, needs more route troubleshooting)</li>
-  <li>Dial another extension on the system</li>
-  <li>Verify two-way audio works (you can hear them, they can hear you)</li>
+<li>Pick up the analog phone connected to the ATA</li>
+<li>Listen for dial tone (confirms ATA is working and registered. If there is no dialtone it is not registered with the PBX, needs more route troubleshooting)</li>
+<li>Dial another extension on the system</li>
+<li>Verify two-way audio works (you can hear them, they can hear you)</li>
 </ol>
 
 <p>If you don't hear dial tone:</p>
 <ul>
-  <li>Check ATA registration (Step 5)</li>
-  <li>Verify the phone is plugged into the correct ATA port (usually "Phone 1")</li>
-  <li>Check the ATA's line settings match the FreePBX extension</li>
+<li>Check ATA registration (<a href="#step6">Step 6</a> for main site, <a href="#step12">Step 12</a> for remote)</li>
+<li>Verify the phone is plugged into the correct ATA port (usually "Phone 1")</li>
+<li>Check the ATA's line settings match the FreePBX extension</li>
 </ul>
 
 <p>If you hear dial tone but calls don't connect:</p>
 <ul>
-  <li>Verify the dial plan on the ATA allows the numbers you're dialing</li>
-  <li>Check FreePBX outbound routes if calling external numbers</li>
+<li>Verify the dial plan on the ATA allows the numbers you're dialing</li>
+<li>Check FreePBX outbound routes if calling external numbers</li>
 </ul>
 
-<hr>
+<a name="step17"></a>
+<h2>Step 17: Export Backups</h2>
 
-<h3>Step 8: Export Backup (if not already done)</h3>
-
-<p>Save a backup of the Brume configuration:</p>
+<p>Save a backup of each Brume configuration:</p>
 
 <ol>
-  <li>Access Brume web UI (via LAN or Tailscale IP)</li>
-  <li>Go to <strong>System → Backup / Restore</strong></li>
-  <li>Click <strong>Export Configuration</strong></li>
-  <li>Save the <code>.tar.gz</code> file with a descriptive name:
+<li>Access Brume web UI (via LAN or Tailscale IP)</li>
+<li>Go to <strong>System → Backup / Restore</strong></li>
+<li>Click <strong>Export Configuration</strong></li>
+<li>Save the .tar.gz file with a descriptive name:
     <ul>
-      <li>Example: <code>brume-sitename-2024-01-15.tar.gz</code></li>
-    </ul>
-  </li>
+    <li>Example: brume-main-2024-01-15.tar.gz</li>
+    <li>Example: brume-uncle-bob-2024-01-15.tar.gz</li>
+    </ul></li>
 </ol>
 
 <p>Store backups safely - they can restore the full configuration if needed.</p>
 
-<hr>
+<a name="optional-wireless"></a>
+<h2>Optional: Wireless Setup with Beryl AX</h2>
 
+<p>If you don't want to place the phone right next to the router or need to avoid running ethernet or phone cables to where you want the phone, you can use a wireless subnet router instead: the <a href="https://www.gl-inet.com/products/gl-mt3000/">GL.iNet Beryl AX (GL-MT3000)</a>.</p>
+
+<p>The Beryl AX connects wirelessly to the remote site's existing WiFi router, then provides a wired ethernet port for the ATA. This lets you place the phone anywhere with a power outlet and WiFi coverage.</p>
+
+<h3>Setting Up Beryl AX in Repeater Mode</h3>
+
+<ol>
+<li>Power on the Beryl AX and connect your computer to it via ethernet or its default WiFi network (check the label on the device for the default SSID and password)</li>
+<li>Access the web UI at http://192.168.8.1</li>
+<li>Complete initial setup (set admin password, timezone, etc.)</li>
+<li>Go to <strong>Network → LAN</strong> and change the LAN IP to a unique subnet (e.g., 192.168.10.1) just like with the Brume 2 - this avoids conflicts</li>
+<li>Click <strong>Apply</strong> and reconnect to the new IP (e.g., http://192.168.10.1)</li>
+<li>Go to <strong>Internet → Repeater</strong></li>
+<li>If you have a spare router give that router the same name and password as the one it will be connected to at your friend's or family member's home and then set up the Beryl AX to log into it, so once it is on site, it will connect directly. Confirm, if you can, if your friend or family member's existing router is 5gHz or 2.5gHz.</li>
+<li>Click <strong>Scan</strong> to find available WiFi networks</li>
+<li>Select the remote site's WiFi network and enter the password</li>
+<li>Click <strong>Join</strong> - the Beryl will connect wirelessly to the wireless network once it is on site. For setup, just use Ethernet.</li>
+<li>Reconnect and verify the connection shows as active in the Repeater section</li>
+</ol>
+
+<h3>Configure Tailscale and Firewall</h3>
+
+<p>Once connected to WiFi or Ethernet, configure Tailscale on the Beryl AX the same way as the Brume 2 in <a href="#step8">Step 8</a>, then configure the firewall as in <a href="#step9">Step 9</a> (Remote Site version):</p>
+
+<ol start="12">
+<li>Go to <strong>Applications → Tailscale</strong> and enable it</li>
+<li>Authenticate with your Tailscale account</li>
+<li>Enable <strong>"Allow Remote Access LAN"</strong> and <strong>"Allow Remote Access WAN"</strong></li>
+<li>SSH to the Beryl: <code>ssh root@192.168.X.1</code></li>
+<li>Configure the UCI firewall zone (Step 8a)</li>
+<li>Configure <code>/etc/rc.local</code> (Step 8b - Remote Site version)</li>
+<li>Configure <code>/etc/firewall.user</code> (Step 8c - Remote Site version)</li>
+<li>Run: <code>tailscale up --advertise-routes=192.168.X.0/24 --accept-routes --reset</code></li>
+<li>Restart firewall: <code>/etc/init.d/firewall restart</code></li>
+<li>Approve the subnet route in Tailscale admin and rename the device</li>
+<li>Export a backup</li>
+</ol>
+
+<h3>Deployment</h3>
+
+<ol>
+<li>Ship or bring the pre-configured Beryl AX, ATA and phone to the remote location</li>
+<li>Power it on anywhere with WiFi coverage - it will automatically connect to the WiFi network you configured</li>
+<li>Connect the ATA to the Beryl's LAN port via ethernet</li>
+<li>Connect an analog phone to the ATA</li>
+<li>The Beryl connects to WiFi → Tailscale → PBX automatically</li>
+</ol>
+
+<div class="note"><strong>Note:</strong> The Beryl AX remembers the WiFi network credentials. If the remote site's WiFi password changes, you'll need to SSH in via Tailscale and update the Repeater settings, or have someone on-site temporarily connect to the Beryl's LAN to access the web UI.</div>
+
+<a name="quick-reference"></a>
 <h2>Quick Reference</h2>
 
 <h3>Key Files on Brume</h3>
 
 <table>
-  <thead>
-    <tr>
-      <th>File</th>
-      <th>Purpose</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>/etc/rc.local</code></td>
-      <td>Tailscale up command at boot</td>
-    </tr>
-    <tr>
-      <td><code>/etc/firewall.user</code></td>
-      <td>MASQUERADE and FORWARD rules</td>
-    </tr>
-    <tr>
-      <td><code>/etc/config/firewall</code></td>
-      <td>UCI firewall zones (persistent)</td>
-    </tr>
-    <tr>
-      <td><code>/etc/config/tailscale</code></td>
-      <td>GL.iNet Tailscale settings</td>
-    </tr>
-    <tr>
-      <td><code>/etc/tailscale/tailscaled.state</code></td>
-      <td>Tailscale auth state</td>
-    </tr>
-  </tbody>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>/etc/rc.local</code></td><td>Tailscale up command at boot</td></tr>
+<tr><td><code>/etc/firewall.user</code></td><td>MASQUERADE and FORWARD rules</td></tr>
+<tr><td><code>/etc/config/firewall</code></td><td>UCI firewall zones (persistent)</td></tr>
+<tr><td><code>/etc/config/tailscale</code></td><td>GL.iNet Tailscale settings</td></tr>
+<tr><td><code>/etc/tailscale/tailscaled.state</code></td><td>Tailscale auth state</td></tr>
 </table>
 
 <h3>Essential Commands</h3>
 
-<pre><code># Check Tailscale status
+<div class="code-box"><code># Check Tailscale status
 tailscale status
 
 # Check advertised routes
@@ -639,76 +813,41 @@ iptables -t nat -L POSTROUTING -n -v | grep MASQ
 /etc/init.d/tailscale restart
 
 # Restart firewall (also runs firewall.user)
-/etc/init.d/firewall restart</code></pre>
+/etc/init.d/firewall restart</code></div>
+
+<h3>Firewall Configuration Differences</h3>
+
+<table>
+<tr><th>Setting</th><th>Main Site</th><th>Remote Site</th></tr>
+<tr><td>Interface</td><td><code>eth0</code> (WAN)</td><td><code>br-lan</code> (LAN)</td></tr>
+<tr><td>Reason</td><td>PBX is on WAN side</td><td>ATA is on LAN side</td></tr>
+<tr><td>rc.local route</td><td>Not needed</td><td>Adds route to PBX</td></tr>
+</table>
 
 <h3>Example Network Layout</h3>
 
 <table>
-  <thead>
-    <tr>
-      <th>Device</th>
-      <th>Tailscale IP</th>
-      <th>LAN Subnet</th>
-      <th>Purpose</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Main Brume</td>
-      <td>100.x.x.1</td>
-      <td>192.168.1.0/24</td>
-      <td>PBX site gateway</td>
-    </tr>
-    <tr>
-      <td>Remote Brume 1</td>
-      <td>100.x.x.2</td>
-      <td>192.168.10.0/24</td>
-      <td>Remote house 1</td>
-    </tr>
-    <tr>
-      <td>Remote Brume 2</td>
-      <td>100.x.x.3</td>
-      <td>192.168.11.0/24</td>
-      <td>Remote house 2</td>
-    </tr>
-    <tr>
-      <td>Remote Brume 3</td>
-      <td>100.x.x.4</td>
-      <td>192.168.12.0/24</td>
-      <td>Remote house 3</td>
-    </tr>
-  </tbody>
+<tr><th>Device</th><th>Tailscale IP</th><th>LAN Subnet</th><th>Purpose</th></tr>
+<tr><td>Main Brume</td><td>100.x.x.1</td><td>192.168.1.0/24</td><td>PBX site gateway</td></tr>
+<tr><td>Remote Brume 1</td><td>100.x.x.2</td><td>192.168.10.0/24</td><td>Remote house 1</td></tr>
+<tr><td>Remote Brume 2</td><td>100.x.x.3</td><td>192.168.11.0/24</td><td>Remote house 2</td></tr>
+<tr><td>Remote Brume 3</td><td>100.x.x.4</td><td>192.168.12.0/24</td><td>Remote house 3</td></tr>
 </table>
 
-<hr>
-
-<h2>Main Site Brume Setup</h2>
-
-<p>The main site Brume (at the PBX location) has slightly different configuration since its WAN is on the same network as the PBX.</p>
-
-<h3>/etc/firewall.user (Main Brume)</h3>
-
-<pre><code># MASQUERADE traffic from WAN subnet to Tailscale
-iptables -t nat -I POSTROUTING -o tailscale0 -s 192.168.1.0/24 -j MASQUERADE
-
-# FORWARD rules for eth0 &lt;-&gt; tailscale0 (WAN to Tailscale)
-iptables -I FORWARD -i tailscale0 -o eth0 -j ACCEPT
-iptables -I FORWARD -i eth0 -o tailscale0 -j ACCEPT
-
-# Restart Tailscale to restore its rules
-/etc/init.d/tailscale restart</code></pre>
-
-<h3>/etc/rc.local (Main Brume)</h3>
-
-<pre><code>. /lib/functions/gl_util.sh
-remount_ubifs
-
-# Wait for Tailscale to be ready
-sleep 10
-
-# Apply Tailscale settings - advertise the PBX subnet
-tailscale up --advertise-routes=192.168.1.0/24 --accept-routes --reset
-
-exit 0</code></pre>
-
-<p>Note: Main Brume uses <code>eth0</code> (WAN) instead of <code>br-lan</code> (LAN) because the PBX is on the WAN side.</p>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.code-box').forEach(function(box) {
+        var btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.textContent = 'Copy';
+        btn.addEventListener('click', function() {
+            var code = box.querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(function() {
+                btn.textContent = 'Copied!';
+                setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+            });
+        });
+        box.appendChild(btn);
+    });
+});
+</script>
