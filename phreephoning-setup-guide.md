@@ -1,6 +1,6 @@
 Phreephoneing: A Free, Private, Encrypted Phone System with Raspberry Pi and Analog Phones
 
-What if you could pick up an old-school telephone in your house, call a friend's house across town, the country or world, and have that call travel over your existing internet connection, fully encrypted, with no monthly bill from a phone company? That's the basic idea behind this project. Phreephoneing is a free, private phone system built from a Raspberry Pis, Analog Telephone Adapters (ATAs), subnet routers, and a main router that creates an encrypted mesh between locations.
+What if you could pick up an old-school telephone in your house, call a friend's house across town, the country or world, and have that call travel over your existing internet connection, fully encrypted, with no monthly bill from a phone company? That's the basic idea behind this project. Phreephoneing is a free, private phone system built from a Raspberry Pi, Analog Telephone Adapters (ATAs), subnet routers, and a main router that creates an encrypted mesh between locations.
 
 # WRT Powered Subnet Router / Tailscale Setup Guide for VoIP ATAs
 
