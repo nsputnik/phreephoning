@@ -631,9 +631,14 @@ The ultimate test - pick up the phone and make a call!
 4. Verify two-way audio works (you can hear them, they can hear you)
 
 If you don't hear dial tone:
-- Check ATA registration (Step 6 for main site, Step 11 for remote)
+- Check ATA registration (Step 6 for main site, Step 12 for remote)
 - Verify the phone is plugged into the correct ATA port (usually "Phone 1")
 - Check the ATA's line settings match the FreePBX extension
+
+If you hear dial tone but get a fast busy signal when calling the remote extension:
+- The remote extension is likely not registered with the PBX
+- Check the remote ATA's registration status in its web admin
+- Verify Tailscale routing (Step 10) and firewall configuration (Step 9)
 
 If you hear dial tone but calls don't connect:
 - Verify the dial plan on the ATA allows the numbers you're dialing
@@ -677,15 +682,15 @@ The Beryl AX connects wirelessly to the remote site's existing WiFi router, then
 
 ### Configure Tailscale and Firewall
 
-Once connected to WiFi or Ethernet, configure Tailscale on the Beryl AX the same way as the Brume 2 in Step 7, then configure the firewall as in Step 8 (Remote Site version):
+Once connected to WiFi or Ethernet, configure Tailscale on the Beryl AX the same way as the Brume 2 in Step 8, then configure the firewall as in Step 9 (Remote Site version):
 
 12. Go to **Applications → Tailscale** and enable it
 13. Authenticate with your Tailscale account
 14. Enable **"Allow Remote Access LAN"** and **"Allow Remote Access WAN"**
 15. SSH to the Beryl: `ssh root@192.168.X.1`
-16. Configure the UCI firewall zone (Step 8a)
-17. Configure `/etc/rc.local` (Step 8b - Remote Site version)
-18. Configure `/etc/firewall.user` (Step 8c - Remote Site version)
+16. Configure the UCI firewall zone (Step 9a)
+17. Configure `/etc/rc.local` (Step 9b - Remote Site version)
+18. Configure `/etc/firewall.user` (Step 9c - Remote Site version)
 19. Run: `tailscale up --advertise-routes=192.168.X.0/24 --accept-routes --reset`
 20. Restart firewall: `/etc/init.d/firewall restart`
 21. Approve the subnet route in Tailscale admin and rename the device
@@ -717,50 +722,71 @@ Once connected to WiFi or Ethernet, configure Tailscale on the Beryl AX the same
 
 ### Essential Commands (Brume 2/Beryl AX)
 
+Check Tailscale status:
 ```bash
-# Check Tailscale status
 tailscale status
+```
 
-# Check advertised routes
+Check advertised routes:
+```bash
 tailscale debug prefs | grep -A3 AdvertiseRoutes
+```
 
-# Test Tailscale routing to an IP
+Test Tailscale routing to an IP:
+```bash
 tailscale ping <ip-address>
+```
 
-# Check firewall rules
+Check firewall rules:
+```bash
 iptables -L FORWARD -n -v | head -10
 iptables -t nat -L POSTROUTING -n -v | grep MASQ
+```
 
-# Restart Tailscale
+Restart Tailscale:
+```bash
 /etc/init.d/tailscale restart
+```
 
-# Restart firewall (also runs firewall.user)
+Restart firewall (also runs firewall.user):
+```bash
 /etc/init.d/firewall restart
 ```
 
 ### Essential Commands (RasPBX)
 
+Check registered extensions:
 ```bash
-# Check registered extensions
 asterisk -rx "pjsip show endpoints"
-# or for chan_sip:
+```
+
+Or for chan_sip:
+```bash
 asterisk -rx "sip show peers"
+```
 
-# Monitor SIP activity in real-time
+Monitor SIP activity in real-time (Control+C to exit):
+```bash
 asterisk -rx "pjsip set logger on"
-# Type Control+C to exit
+```
 
-# Live console with verbosity (more v's = more detail)
+Live console with verbosity - more v's = more detail (type "quit" to exit):
+```bash
 asterisk -rvvvv
-# Type "quit" or "exit" to leave
+```
 
-# Check active calls
+Check active calls:
+```bash
 asterisk -rx "core show calls"
+```
 
-# View recent call history
+View recent call history:
+```bash
 asterisk -rx "core show channels verbose"
+```
 
-# Restart Asterisk (if needed)
+Restart Asterisk (if needed):
+```bash
 systemctl restart asterisk
 ```
 
