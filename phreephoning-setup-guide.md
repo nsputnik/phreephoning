@@ -29,7 +29,7 @@ Remote Site                          Main Site
 - GL.iNet Brume 2 (GL-MT2500) router, one for each remote line and one for the main site that will be on the same local network as the PBX https://www.gl-inet.com/products/gl-mt2500/ or GL.iNet Beryl AX (GL-MT3000)](https://www.gl-inet.com/products/gl-mt3000/)  which is the wireless version, great to use when one of your remote line users does not want to place the phone next to the router, but to another location without having to run ethernet cables.  When we mention the remote Brume 2 and Tailscale, the Beryl AX can be substituted here, but we'll go into the wireless details in a separate section near the end.
 - Tailscale account (free tier is adequate) https://tailscale.com/
 - Tailscale client installed on your admin computer** - download from https://tailscale.com/download and sign in with the same Tailscale account. This allows you to SSH into any Brume via its Tailscale IP and also into each ATA admin. You will be on the same Tailnet.
-- A Raspberry Pi 3, 4, or 5 (not Zero) with RasPBX image written to the microSD card http://www.raspbx.org/downloads/
+- A Raspberry Pi 3, 4, or 5 (not Zero) with RasPBX image written to the microSD card http://www.raspbx.org/downloads/ RasPBX is just Asterisk 16.13.0 & FreePBX 15.0.16.75, Raspbian Buster Lite, Apache, PHP and MySQL all pre-installed on a bootable image.
 - An ATA device for each line (Cisco SPA, Linksys PAP2T, Grandstream HT802, etc.) https://www.ebay.com/sch/i.html?_nkw=analog+telephone+adapter
 - An old touch tone analog telephone at each location you want to call or you want to call you.
 
