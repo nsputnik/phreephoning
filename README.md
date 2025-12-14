@@ -1,0 +1,1 @@
+This is just a version controlled markdown file that contains the instuctions for setting up a free, private, encrypted phone system with analog phones, ATA, subnet routers and Raspbery Pi.  It does not have info about connecting to the larger phone ystem but I suppose it is possible (but tha is not my interest).
