@@ -377,7 +377,7 @@ To avoid IP conflicts, configure each remote Brume while:
 
 14. Go to https://login.tailscale.com/admin/machines
 15. Find the new Brume and **approve the subnet route**
-16. **Rename the device** - use the name or initials of the friend/family member where it will be deployed (e.g., "gl-mt2500-uncle-bob", "gl-mt2500-mom-dad")
+16. **Rename the device** - use the name or initials of the friend/family member where it will be deployed (e.g., "gl-mt2500-uncle-bob", "gl-mt2500-mom-dad") This is done by clicking the 3 dost on the right and selecting Edit Rout Settings.  Then you will see the route or routes to approve.
 
 ### Choosing a Subnet
 
