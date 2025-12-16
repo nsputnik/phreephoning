@@ -652,10 +652,8 @@ Save a backup of each Brume configuration:
 1. Access Advanced Settings by logging in to the Brume 2's administration panel through your browser (use the Tailscale IP address for that location) and navigate to More Settings -> Advanced.
 2. Click log into LuCi. You will be prompted to log in to the LuCi interface using your root username and password.
 3. Hover over the System menu at the top nav In the LuCi interface anc click Backup/Flash Firmware.
-4. Click Generate archive. This will download a .tar.gz file This is a snapshot for all settings in the this Brume 2. Make sure to prepend the file name with the name of the location or friend/family member that this Brume 2 live at, Example: `main-backup-GL-MT2500-2025-12-15.tar.gz`, `uncle-bob-backup-GL-MT2500-2025-12-15.tar.gz`
-5. Restore Settings (if and when needed) On the same page in LuCi you can click Upload archive under the restore settings if you had to reset the Brume 2 for some reason or misconfigured it in some way.
-
-Store backups safely - they can restore the full configuration if needed.
+4. Click Generate archive. This will download a .tar.gz file. This is a snapshot for all settings in the this Brume 2. Make sure to prepend the file name with the name of the location or friend/family member that this Brume 2 lives at, Example: `main-backup-GL-MT2500-2025-12-15.tar.gz`, `uncle-bob-backup-GL-MT2500-2025-12-15.tar.gz`
+5. Restore Settings (if and when needed) On the same page in LuCi you can click Upload archive under the restore settings if you had to reset the Brume 2 for some reason or misconfigured it in some way. Store them in a safe place.
 
 ---
 
