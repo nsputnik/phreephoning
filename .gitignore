@@ -10,3 +10,10 @@
 *-personal.md
 *copy.md
 WORK COMPLETED*
+
+# Local security documentation (contains setup-specific details)
+phreephoning-security-hardening.md
+security-implementation-checklist.md
+phreephoning-journal.md
+hardening-checklist.md
+brume2-tailscale-troubleshooting-guide.md
