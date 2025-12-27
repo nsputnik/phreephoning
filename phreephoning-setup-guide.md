@@ -111,6 +111,14 @@ ssh root@192.168.8.1
 ```
 (Password is the same as the web UI admin password you created)
 
+### Make Filesystem Writable
+
+GL.iNet routers use a read-only overlay filesystem by default. Run this command first to ensure your changes persist across reboots:
+
+```bash
+. /lib/functions/gl_util.sh && remount_ubifs
+```
+
 ### 2a. Create UCI Firewall Zone
 
 Run these commands to create a Tailscale firewall zone:
@@ -403,6 +411,14 @@ SSH to the remote Brume to configure the firewall rules. These are specific to *
 ssh root@192.168.X.1
 ```
 (Replace X with your subnet number, e.g., 192.168.10.1. Password is the same as the web UI admin password you created)
+
+### Make Filesystem Writable
+
+GL.iNet routers use a read-only overlay filesystem by default. Run this command first to ensure your changes persist across reboots:
+
+```bash
+. /lib/functions/gl_util.sh && remount_ubifs
+```
 
 ### 9a. Create UCI Firewall Zone
 
