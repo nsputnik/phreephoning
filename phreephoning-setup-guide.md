@@ -40,7 +40,7 @@ Remote Site                          Main Site
 **Main Site Setup (do these first):**
 - Step 1: Main Site Brume 2 Setup
 - Step 2: Main Site Firewall Configuration
-- Step 3: Reserve PBX IP Address
+- Step 3: Reserve PBX and Brume IP Addresses
 - Step 4: Create Extensions in FreePBX
 - Step 5: Configure Main Site ATA
 - Step 6: Verify Main Site SIP Registration
@@ -218,11 +218,15 @@ tailscale up --advertise-routes=192.168.1.0/24 --accept-routes --reset
 
 ---
 
-## Step 3: Reserve PBX IP Address
+## Step 3: Reserve PBX and Brume IP Addresses
 
-Log into your main site router and create a DHCP reservation for the PBX (Raspberry Pi). This prevents the router from assigning a different IP address to the PBX after a power outage or reboot, which would require updating all ATA configurations.
+Log into your main site router and create DHCP reservations (also called "static leases" or "address reservations") for two devices:
 
-Look for DHCP reservation, static lease, or address reservation in your router's settings. You'll need the PBX's MAC address and its current IP (192.168.1.100 or whatever you've been using).
+1. **The PBX (Raspberry Pi)** at its current IP (e.g., 192.168.1.100). Without this, the router may assign a different IP after a power outage or reboot, and every ATA's SIP Proxy setting would need updating.
+
+2. **The Brume 2** at its current WAN IP. Tailscale routing won't break if this changes — the Tailscale IP is independent — but reserving it preserves your **local-subnet fallback access**: SSH or web admin to a known IP on the LAN if Tailscale itself ever fails. This is your only out-of-band recovery path for the Brume.
+
+Look for DHCP reservation, static lease, or address reservation in your router's settings. You'll need each device's MAC address and current IP.
 
 ---
 
@@ -270,8 +274,12 @@ Access the ATA's web interface and configure:
 | User ID | Extension number (e.g., 100) |
 | Auth ID | Same as User ID |
 | Password | SIP secret from FreePBX |
+| NAT Mapping Enable | Yes |
+| NAT Keep Alive Enable | Yes |
 
 If you will use both lines on a 2 line ATA the 2nd line should use SIP port 5061, and it might set this automatically, but verify it.
+
+> **Why NAT Mapping / NAT Keep Alive matter:** even at the main site the ATA usually sits behind your home router's NAT. With these enabled, the ATA periodically refreshes its NAT binding so the PBX can reach it for inbound calls. With them disabled, registration may appear to succeed but the path silently breaks after the NAT entry ages out, and inbound calls fail.
 
 **Click "Submit All Changes"** to save and trigger registration.
 
@@ -304,7 +312,9 @@ Should show the extension with status "OK" or "Avail".
 
 ### Test Dial Tone
 
-Pick up the phone connected to the main site ATA. You should hear a dial tone, confirming the ATA is registered with the PBX.
+Pick up the phone connected to the main site ATA. You should hear a dial tone.
+
+> **Heads up — dial tone alone doesn't always mean registered.** On Linksys and Cisco SPA-style ATAs (including the Cisco ATA 191/192), dial tone is gated on registration: no dial tone means not registered. **Grandstream ATAs (HT801/802/812/813/818) give a dial tone whether they're registered or not** — the dial tone is generated locally by the ATA, not by the PBX. Always confirm registration via the ATA's web admin Status page or `pjsip show endpoints` on the PBX rather than relying on dial tone.
 
 ---
 
@@ -325,6 +335,10 @@ Connect the remote ATA directly to your main router (the same network as the PBX
 | User ID | Extension number (e.g., 101) |
 | Auth ID | Same as User ID |
 | Password | SIP secret from FreePBX (created in Step 4) |
+| NAT Mapping Enable | Yes |
+| NAT Keep Alive Enable | Yes |
+
+> **Don't skip the NAT settings.** Once this ATA is deployed behind a remote Brume 2, it lives behind two layers of NAT (Brume LAN → remote site's WAN). Without `NAT Mapping Enable` and `NAT Keep Alive Enable` set to Yes, the ATA stops refreshing its NAT binding, the PBX loses the path, and registration silently dies — usually 30–60 seconds after a successful first registration. Set these now while you're testing locally so you don't have to revisit them after deployment.
 
 **Click "Submit All Changes"** to save and trigger registration.
 
@@ -399,7 +413,9 @@ Use a unique /24 subnet for each site:
 | Remote Site 3 | 192.168.11.0/24 | 192.168.11.1 |
 | Remote Site 4 | 192.168.12.0/24 | 192.168.12.1 |
 
-> **Why start above 8?** The Brume defaults to 192.168.8.x. Using 9, 10, 11... makes it easy to remember which site is which and avoids conflicts with the default. Also avoid 192.168.0.x and 192.168.1.x as these are common home network subnets that may conflict at remote sites.
+> **Why start above 8?** The Brume defaults to 192.168.8.x. Using 9, 10, 11... makes it easy to remember which site is which and avoids conflicts with the default.
+>
+> **Two subnets to think about — yours, and theirs.** Pick a unique third octet for *your* Brume's LAN. But also be aware that the **remote site's upstream router** (the one the Brume's WAN plugs into) often hands out `192.168.0.0/24` or `192.168.1.0/24` — these are common ISP/router defaults you don't control. When the remote site's WAN happens to be on the same subnet as the PBX (`192.168.1.0/24`), the Brume's kernel sees the PBX's `/24` as directly-connected on its WAN port and tries to route PBX traffic out the WAN instead of over Tailscale. Step 9b's rc.local installs a per-host `/32` route to handle this case automatically, so you don't have to renumber the upstream router. Just be aware this is why that line is there.
 
 ---
 
@@ -467,18 +483,24 @@ cat > /etc/rc.local << 'ENDFILE'
 . /lib/functions/gl_util.sh
 remount_ubifs
 
-# Wait for Tailscale to be ready
-sleep 10
-
 # Apply Tailscale settings - CHANGE SUBNET BELOW
 tailscale up --advertise-routes=192.168.X.0/24 --accept-routes --reset
 
-# Add explicit route to PBX - CHANGE IP BELOW IF DIFFERENT
-ip route add 192.168.1.100/32 dev tailscale0 2>/dev/null || true
+# Force PBX traffic over Tailscale, even if the remote site's WAN is
+# also on 192.168.1.0/24 (common ISP default). A per-host /32 wins by
+# longest-prefix-match over the connected /24 on the WAN interface.
+# CHANGE THE PBX IP BELOW IF YOURS IS DIFFERENT.
+( for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    ip link show tailscale0 >/dev/null 2>&1 && break
+    sleep 2
+  done
+  ip route replace 192.168.1.100/32 dev tailscale0 ) &
 
 exit 0
 ENDFILE
 ```
+
+> **Why the wait loop and `ip route replace`?** `tailscale0` doesn't exist until tailscaled has started, which on these GL.iNet builds is *after* `rc.local` runs. The loop polls until the interface appears (up to 30 seconds), then installs the route. `ip route replace` is idempotent — it works whether the route already exists from a prior boot or not — so this never fails silently the way `ip route add ... 2>/dev/null || true` would.
 
 Verify:
 ```bash
@@ -545,6 +567,25 @@ ping -c 3 192.168.1.100
 2. Run `tailscale up --accept-routes --reset` again on the remote Brume
 3. Wait 30 seconds and retry
 
+### If `tailscale ping` works but plain `ping` to the PBX fails:
+
+This is the **WAN/PBX subnet collision** described in Step 8 — the remote site's upstream router is also using `192.168.1.0/24`, so the Brume's kernel routes PBX traffic out the WAN interface instead of through Tailscale. Verify the `/32` route from `/etc/rc.local` actually fired:
+
+```bash
+ip route get 192.168.1.100
+# Good:  192.168.1.100 dev tailscale0 ...
+# Bad:   192.168.1.100 via 192.168.1.1 dev eth0 ...
+```
+
+If you see `dev eth0`, run the route command by hand to fix it immediately:
+
+```bash
+ip route replace 192.168.1.100/32 dev tailscale0
+ping -c 3 192.168.1.100
+```
+
+If that works, the rc.local pattern from Step 9b will reapply it on every boot. If `tailscale0` was missing entirely, check `tailscale status` — Tailscale itself may not have come up.
+
 ---
 
 ## Step 11: Reconfigure Remote ATA for Deployment
@@ -599,6 +640,12 @@ Once pre-configured and tested locally, deployment is simple:
 5. Power on - the Brume will automatically connect to Tailscale
 6. Test by calling between the remote phone and main site phone
 
+### Reserve the Brume's IP at the remote site (if you can)
+
+If you have access to the remote site's home router admin, create a DHCP reservation for the Brume's WAN IP, the same way you did at the main site in Step 3. This isn't required for Tailscale to work — the Tailscale IP is stable regardless — but it preserves local-network access to the Brume if Tailscale ever fails. Without it, after a power outage the Brume may come back on a different WAN IP and the only way to find it locally is asking the homeowner to look at their router's client list.
+
+If you don't have admin access to the remote site's router, skip this step. All your remote administration will go over Tailscale anyway.
+
 ### Remote Administration
 
 If anything goes wrong, you can access the Brume remotely via its Tailscale IP:
@@ -642,7 +689,7 @@ If registration fails after reboot, check:
 The ultimate test - pick up the phone and make a call!
 
 1. Pick up the analog phone connected to the ATA
-2. Listen for dial tone (confirms ATA is working and registered. If there is no dialtone it is not registered with the PBX, needs more route troubleshooting)
+2. Listen for dial tone. **On Linksys and Cisco SPA-style ATAs**, dial tone confirms the ATA is registered — no dial tone means registration failed and you need more route troubleshooting. **On Grandstream ATAs**, you'll hear dial tone whether the ATA is registered or not, so verify registration via the ATA's web admin Status page or `pjsip show endpoints` on the PBX before assuming things are working. Try dialing an extension — fast busy or silence at that point indicates registration actually failed.
 3. Dial another extension on the system
 4. Verify two-way audio works (you can hear them, they can hear you)
 
@@ -819,3 +866,11 @@ systemctl restart asterisk
 | Remote Brume 1 | 100.x.x.2 | 192.168.10.0/24 | Remote house 1 |
 | Remote Brume 2 | 100.x.x.3 | 192.168.11.0/24 | Remote house 2 |
 | Remote Brume 3 | 100.x.x.4 | 192.168.12.0/24 | Remote house 3 |
+
+---
+
+## Revision History
+
+| Date | Change |
+|------|--------|
+| 2026-04-27 | Added `NAT Mapping Enable` / `NAT Keep Alive Enable` to ATA SIP settings (Steps 5, 7). Hardened Step 9b's `/etc/rc.local` route pattern (wait loop + `ip route replace`). Clarified the WAN-vs-LAN subnet warning in Step 8. Added Step 10 diagnostic for the WAN/PBX subnet collision case. Added Grandstream dial-tone caveat (Steps 6, 15). Broadened Step 3 to also reserve the Brume's WAN IP, with matching note in Step 13. |
